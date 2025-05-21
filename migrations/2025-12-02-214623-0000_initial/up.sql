@@ -1,0 +1,6 @@
+CREATE TABLE uploads (
+    id INTEGER PRIMARY KEY NOT NULL,
+    message TEXT,
+    data BLOB NOT NULL,
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

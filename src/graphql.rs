@@ -1,0 +1,61 @@
+use juniper::{EmptySubscription, FieldError, FieldResult, RootNode};
+
+use crate::{
+    context::GraphQLContext,
+    models::{Upload, UploadInput},
+    svc::UploadSvc,
+};
+
+pub struct Query;
+
+#[juniper::graphql_object(context = GraphQLContext)]
+impl Query {
+    // Uploads
+    pub async fn get_upload(context: &GraphQLContext, upload_id: i32) -> FieldResult<Upload> {
+        graphql_translate_anyhow(UploadSvc::get(context, upload_id))
+    }
+    pub fn list_uploads(
+        context: &GraphQLContext,
+        limit: Option<i32>,
+        offset: Option<i32>,
+    ) -> FieldResult<Vec<Upload>> {
+        let limit = limit.unwrap_or(100);
+        let offset = offset.unwrap_or(0);
+        graphql_translate_anyhow(UploadSvc::list(context, limit, offset))
+    }
+}
+
+pub struct Mutation;
+
+#[juniper::graphql_object(context = GraphQLContext)]
+impl Mutation {
+    // Uploads
+    pub async fn create_client(
+        context: &GraphQLContext,
+        client: UploadInput,
+    ) -> FieldResult<Upload> {
+        graphql_translate_anyhow(UploadSvc::create(context, &client.into()))
+    }
+    pub async fn update_client(
+        context: &GraphQLContext,
+        client: UploadInput,
+    ) -> FieldResult<Upload> {
+        graphql_translate_anyhow(UploadSvc::update(context, &client.into()))
+    }
+    pub async fn delete_client(context: &GraphQLContext, upload_id: i32) -> FieldResult<bool> {
+        graphql_translate_anyhow(UploadSvc::delete(context, upload_id))?;
+        Ok(true)
+    }
+}
+
+pub type Schema = RootNode<Query, Mutation, EmptySubscription<GraphQLContext>>;
+pub fn create_schema() -> Schema {
+    Schema::new(Query, Mutation, EmptySubscription::new())
+}
+
+pub fn graphql_translate_anyhow<T>(res: anyhow::Result<T>) -> FieldResult<T> {
+    match res {
+        Ok(t) => Ok(t),
+        Err(e) => Err(FieldError::from(e)),
+    }
+}

@@ -6,6 +6,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import 'react-toastify/dist/ReactToastify.css';
 
 const PageTemplate = React.lazy(() => import('page/PageTemplate'));
+const ImagePreview = React.lazy(() => import('ImagePreview'));
 // const Clients = React.lazy(() => import('page/Clients'));
 // const Client = React.lazy(() => import('page/Client'));
 
@@ -19,6 +20,10 @@ const router = createBrowserRouter([
     path: '/',
     element: <PageTemplate />,
     children: [
+      {
+        index: true,
+        element: <ImagePreview />,
+      },
       // {
       //   index: true,
       //   element: <Clients />,

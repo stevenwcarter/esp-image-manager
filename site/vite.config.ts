@@ -4,6 +4,8 @@ import eslint from 'vite-plugin-eslint';
 import viteTsconfigPaths from 'vite-tsconfig-paths';
 import svgrPlugin from 'vite-plugin-svgr';
 import tailwindcss from '@tailwindcss/vite';
+import wasm from 'vite-plugin-wasm';
+import topLevelAwait from 'vite-plugin-top-level-await';
 
 const PROXY_ENDPOINT = 'http://localhost:7007';
 
@@ -29,8 +31,23 @@ export default defineConfig(() => {
         ],
       },
     },
-    plugins: [react(), eslint(), viteTsconfigPaths(), svgrPlugin(), tailwindcss()],
+    plugins: [
+      react(),
+      eslint(),
+      wasm(),
+      topLevelAwait(),
+      viteTsconfigPaths(),
+      svgrPlugin(),
+      tailwindcss(),
+    ],
+    optimizeDeps: {
+      exclude: ['wasm-image-preview'],
+    },
     server: {
+      fs: {
+        // Allow serving files from one level up to the project root
+        allow: ['..'],
+      },
       watch: {
         ignored: ['coverage', 'build'],
       },

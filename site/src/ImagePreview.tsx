@@ -18,6 +18,7 @@ const WasmImagePreview = () => {
     y: number;
     width: number;
     height: number;
+    flipped?: boolean;
   } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -240,22 +241,27 @@ const WasmImagePreview = () => {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const currentX = e.clientX - (rect.left < rect.right ? rect.left : rect.right);
-    const currentY = e.clientY - (rect.top < rect.bottom ? rect.top : rect.bottom);
+    const currentX = e.clientX - rect.left;
+    const currentY = e.clientY - rect.right;
 
-    const width = currentX - cropArea.x;
-    const height = currentY - cropArea.y;
+    if (currentX > cropArea.y) {
+      cropArea.flipped = false;
+    } else {
+      cropArea.flipped = true;
+    }
+    const width = !cropArea.flipped ? currentX - cropArea.x : cropArea.x - currentX;
+    const height = !cropArea.flipped ? currentY - cropArea.y : cropArea.y - currentY;
 
     // Determine if we should use 2:1 or 1:2 aspect ratio based on drag direction
     let newWidth: number, newHeight: number;
-    if (Math.abs(width) > Math.abs(height)) {
+    if (width > height) {
       // Landscape: maintain 2:1 ratio
       newWidth = width;
-      newHeight = height > 0 ? Math.abs(width) / 2 : -(Math.abs(width) / 2);
+      newHeight = width / 2;
     } else {
       // Portrait: maintain 1:2 ratio
       newHeight = height;
-      newWidth = width > 0 ? Math.abs(height) / 2 : -(Math.abs(height) / 2);
+      newWidth = height / 2;
     }
 
     setCropArea({ ...cropArea, width: newWidth, height: newHeight });
@@ -324,8 +330,8 @@ const WasmImagePreview = () => {
   if (cropArea) {
     // style.left = cropArea.x + 8;
     // style.top = cropArea.y + 8;
-    style.width = cropArea.width;
-    style.height = cropArea.height;
+    style.width = Math.abs(cropArea.width);
+    style.height = Math.abs(cropArea.height);
     if (cropArea.width < 0) {
       style.right = cropArea.x + 8;
     } else {
@@ -337,6 +343,8 @@ const WasmImagePreview = () => {
       style.top = cropArea.y + 8;
     }
   }
+  console.log(cropArea);
+  console.log('Crop area style:', style);
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
@@ -535,15 +543,10 @@ const WasmImagePreview = () => {
                         onMouseUp={handleCanvasMouseUp}
                       />
 
-                      {cropArea && cropArea.width > 0 && cropArea.height > 0 && (
+                      {cropArea && cropArea.width != 0 && cropArea.height != 0 && (
                         <div
                           className="absolute border-2 border-blue-500 bg-blue-200/30 pointer-events-none"
-                          style={{
-                            left: cropArea.x + 8, // Account for padding
-                            top: cropArea.y + 8, // Account for padding
-                            width: cropArea.width,
-                            height: cropArea.height,
-                          }}
+                          style={style}
                         />
                       )}
                     </div>

@@ -10,7 +10,7 @@ type CreateUploadResponse = {
   createUpload: Upload;
 };
 
-export const useClients = () => {
+export const useUploads = () => {
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [createUploadMutation] = useMutation<CreateUploadResponse>(CREATE_UPLOAD_GQL, {
     refetchQueries: [LIST_UPLOADS_GQL],
@@ -29,17 +29,17 @@ export const useClients = () => {
         variables: { upload },
       });
     } catch (error) {
-      console.error('Error creating client:', error);
+      console.error('Error creating upload:', error);
     }
   };
 
-  // const deleteClient = async (clientUuid: string) => {
+  // const deleteUpload = async (uploadUuid: string) => {
   //   try {
   //     await deleteUploadMutation({
-  //       variables: { clientUuid },
+  //       variables: { uploadUuid },
   //     });
   //   } catch (error) {
-  //     console.error('Error deleting client:', error);
+  //     console.error('Error deleting upload:', error);
   //   }
   // };
 

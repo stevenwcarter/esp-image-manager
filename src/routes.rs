@@ -3,23 +3,60 @@ use crate::context::GraphQLContext;
 use crate::graphql::{create_schema, Schema};
 
 use axum::extract::{Request, WebSocketUpgrade};
-use axum::http::HeaderValue;
+use axum::http::{HeaderValue, Uri};
 use axum::middleware::{self, Next};
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, on, MethodFilter};
 use axum::{Extension, Router};
 use juniper_axum::extract::JuniperRequest;
 use juniper_axum::response::JuniperResponse;
 use juniper_axum::{graphiql, playground, subscriptions};
 use juniper_graphql_ws::ConnectionConfig;
-use reqwest::{header, Method};
+use reqwest::{header, Method, StatusCode};
+use rust_embed::RustEmbed;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::services::{ServeDir, ServeFile};
 
-pub fn app(context: Arc<GraphQLContext>) -> Router {
+#[derive(RustEmbed, Clone)]
+#[folder = "site/build/"]
+struct Assets;
+
+pub struct StaticFile<T>(pub T);
+
+impl<T> IntoResponse for StaticFile<T>
+where
+    T: Into<String>,
+{
+    fn into_response(self) -> Response {
+        let path = self.0.into();
+
+        match Assets::get(path.as_str()) {
+            Some(content) => {
+                let mime = mime_guess::from_path(path).first_or_octet_stream();
+                ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
+            }
+            None => (StatusCode::NOT_FOUND, "404 Not Found").into_response(),
+        }
+    }
+}
+
+async fn static_handler(uri: Uri) -> impl IntoResponse {
+    let mut path = uri.path().trim_start_matches('/').to_owned();
+
+    if path.starts_with("dist/") {
+        path = path.replace("dist/", "");
+    }
+
+    StaticFile(path)
+}
+
+async fn index_handler() -> impl IntoResponse {
+    static_handler("/index.html".parse::<Uri>().unwrap()).await
+}
+
+pub fn app(context: GraphQLContext) -> Router {
     let qm_schema = create_schema();
 
     let cors = CorsLayer::new()
@@ -49,21 +86,24 @@ pub fn app(context: Arc<GraphQLContext>) -> Router {
         .layer(Extension(context.clone()))
         .layer(Extension(Arc::new(qm_schema)));
 
-    let site_router = Router::new()
-        .nest_service(
-            "/assets",
-            ServiceBuilder::new().service(ServeDir::new("site/build/assets")),
-        )
-        .layer(middleware::from_fn(set_static_cache_control))
-        .nest_service(
-            "/",
-            ServeDir::new("site/build").not_found_service(ServeFile::new("site/build/index.html")),
-        );
+    // let site_router = Router::new()
+    //     .nest_service(
+    //         "/assets",
+    //         ServiceBuilder::new().service(ServeDir::new("site/build/assets")),
+    //     )
+    //     .layer(middleware::from_fn(set_static_cache_control))
+    //     .nest_service(
+    //         "/",
+    //         ServeDir::new("site/build").not_found_service(ServeFile::new("site/build/index.html")),
+    //     );
 
     Router::new()
+        .route("/assets/{*uri}", get(static_handler))
+        .layer(middleware::from_fn(set_static_cache_control))
         .nest("/graphql", graphql_routes)
         .nest("/api/v1", api_routes(context.clone()))
-        .nest("/", site_router)
+        .route("/", get(index_handler))
+        .fallback_service(get(index_handler))
         .layer(Extension(context.clone()))
         .layer(middleware)
 }

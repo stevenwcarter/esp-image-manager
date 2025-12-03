@@ -1,11 +1,14 @@
 import Button from 'components/Button';
+import { useUploads } from 'hooks/useUploads';
 import { useEffect, useState, useRef, useCallback, ChangeEvent } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { ReactSketchCanvas, ReactSketchCanvasRef } from 'react-sketch-canvas';
 // Import the default initialization function and the specific Rust functions
-import init, { preview, greet } from 'wasm-image-preview';
+import init, { preview } from 'wasm-image-preview';
 
 const WasmImagePreview = () => {
+  const { createUpload } = useUploads();
+  const [uploadData, setUploadData] = useState<Uint8Array | null>(null);
   const [isWasmLoaded, setIsWasmLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
@@ -25,6 +28,27 @@ const WasmImagePreview = () => {
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasDrawRef = useRef<ReactSketchCanvasRef>(null);
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const handleSubmit = () => {
+    if (!isWasmLoaded || !uploadData) return;
+
+    if (!(Uint8Array.prototype as any).toBase64) {
+      (Uint8Array.prototype as any).toBase64 = function () {
+        let binary = '';
+        const len = this.length;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(this[i]);
+        }
+        return btoa(binary);
+      };
+    }
+
+    createUpload({
+      message: 'WASM Test Upload',
+      data: (uploadData as any).toBase64(),
+      public: true,
+    });
+  };
 
   // Throttle preview updates to at most once per 100ms
   const lastUpdateTime = useRef<number>(0);
@@ -74,6 +98,7 @@ const WasmImagePreview = () => {
 
   // Helper: Unpack 1-bit data to RGBA for Canvas
   const drawPackedImage = (packedData: Uint8Array) => {
+    setUploadData(packedData);
     const canvas = previewCanvasRef.current;
     if (!canvas) return;
 
@@ -656,11 +681,11 @@ const WasmImagePreview = () => {
               {/* Test WASM Button */}
               <div className="mt-6 pt-4 border-t border-gray-700">
                 <button
-                  onClick={() => greet('React User')}
+                  onClick={handleSubmit}
                   className="w-full px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={!isWasmLoaded}
                 >
-                  Test WASM Connection
+                  Submit
                 </button>
               </div>
             </div>

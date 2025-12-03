@@ -1,8 +1,8 @@
 [package]
-name = "axum-react-starter"
+name = "image-manager"
 version = "0.1.0"
 edition = "2021"
-default-run = "axum-react-starter"
+default-run = "image-manager"
 
 [profile.release]
 codegen-units = 1
@@ -76,6 +76,14 @@ chrono-tz = { version = "0.10.3", features = ["serde"] }
 bigdecimal = { version = "0.4.8", features = ["serde", "serde_json"] }
 tracing = "0.1.41"
 base64 = "0.22.1"
+rust-embed = { version = "8.9.0", features = [
+  "axum",
+  "axum-ex",
+  "compression",
+  "debug-embed",
+  "tokio",
+] }
+mime_guess = "2.0.5"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"

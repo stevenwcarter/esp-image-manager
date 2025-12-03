@@ -35,7 +35,7 @@ impl Mutation {
         context: &GraphQLContext,
         upload: UploadInput,
     ) -> FieldResult<Upload> {
-        graphql_translate_anyhow(UploadSvc::create(context, &upload.into()))
+        graphql_translate_anyhow(UploadSvc::create(context, &upload.into()).await)
     }
 }
 

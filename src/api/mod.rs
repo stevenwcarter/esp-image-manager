@@ -1,6 +1,5 @@
 use core::fmt;
 use std::str::FromStr;
-use std::sync::Arc;
 
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
@@ -11,7 +10,7 @@ use serde::{de, Deserialize, Deserializer, Serialize};
 
 use crate::context::GraphQLContext;
 
-pub fn api_routes(_context: Arc<GraphQLContext>) -> Router {
+pub fn api_routes(_context: GraphQLContext) -> Router {
     Router::new().route("/test", get(test))
 }
 

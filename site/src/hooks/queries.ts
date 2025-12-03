@@ -6,6 +6,7 @@ export const CREATE_UPLOAD_GQL = gql`
     createUpload(upload: $upload) {
       message
       data
+      public
     }
   }
 `;

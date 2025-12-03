@@ -8,4 +8,5 @@ export type Upload = {
 export type UploadInput = {
   message?: string;
   data: string;
+  public: boolean;
 };

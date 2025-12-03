@@ -2,6 +2,7 @@ import Button from 'components/Button';
 import { useEffect, useState, useRef, useCallback, ChangeEvent } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { ReactSketchCanvas, ReactSketchCanvasRef } from 'react-sketch-canvas';
+import useDebounce from 'hooks/useDebounce';
 // Import the default initialization function and the specific Rust functions
 import init, { preview, greet } from 'wasm-image-preview';
 
@@ -20,9 +21,14 @@ const WasmImagePreview = () => {
     height: number;
   } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const canvasDrawRef = useRef<ReactSketchCanvasRef>(null);
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Debounce crop area changes for preview updates
+  const debouncedCropArea = useDebounce(cropArea, 100);
 
   const handleEraserClick = () => {
     setEraseMode(true);
@@ -45,6 +51,13 @@ const WasmImagePreview = () => {
   // Constants
   const DISPLAY_WIDTH = 128;
   const DISPLAY_HEIGHT = 64;
+
+  // Process crop area changes with debounce
+  useEffect(() => {
+    if (debouncedCropArea && debouncedCropArea.width !== 0 && debouncedCropArea.height !== 0) {
+      processCroppedImage();
+    }
+  }, [debouncedCropArea]);
 
   // 1. Initialize Wasm module on mount
   useEffect(() => {
@@ -126,6 +139,13 @@ const WasmImagePreview = () => {
   //     setError('Error processing drawing');
   //   }
   // };
+
+  // Process crop area changes with debounce
+  useEffect(() => {
+    if (debouncedCropArea && debouncedCropArea.width !== 0 && debouncedCropArea.height !== 0) {
+      processCroppedImage();
+    }
+  }, [debouncedCropArea]);
 
   // Handle drawing canvas changes
   const handleDrawingChange = async () => {
@@ -229,19 +249,43 @@ const WasmImagePreview = () => {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Check if clicking inside existing crop rectangle
+    if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
+      const cropLeft = cropArea.width < 0 ? cropArea.x + cropArea.width : cropArea.x;
+      const cropTop = cropArea.height < 0 ? cropArea.y + cropArea.height : cropArea.y;
+      const cropRight = cropLeft + Math.abs(cropArea.width);
+      const cropBottom = cropTop + Math.abs(cropArea.height);
+
+      if (x >= cropLeft && x <= cropRight && y >= cropTop && y <= cropBottom) {
+        // Start dragging existing crop rectangle
+        setIsDragging(true);
+        setDragOffset({ x: x - cropArea.x, y: y - cropArea.y });
+        return;
+      }
+    }
+
+    // Start creating new crop rectangle
     setIsDrawing(true);
     setCropArea({ x, y, width: 0, height: 0 });
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !cropArea) return;
-
     const canvas = imageCanvasRef.current;
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
     const currentX = e.clientX - rect.left;
     const currentY = e.clientY - rect.top;
+
+    if (isDragging && cropArea) {
+      // Dragging existing crop rectangle
+      const newX = currentX - dragOffset.x;
+      const newY = currentY - dragOffset.y;
+      setCropArea({ ...cropArea, x: newX, y: newY });
+      return;
+    }
+
+    if (!isDrawing || !cropArea) return;
 
     const width = currentX - cropArea.x;
     const height = currentY - cropArea.y;
@@ -268,10 +312,8 @@ const WasmImagePreview = () => {
 
   const handleCanvasMouseUp = () => {
     setIsDrawing(false);
-
-    if (cropArea && cropArea.width != 0 && cropArea.height != 0) {
-      processCroppedImage();
-    }
+    setIsDragging(false);
+    setDragOffset({ x: 0, y: 0 });
   };
 
   const processCroppedImage = async () => {
@@ -532,8 +574,9 @@ const WasmImagePreview = () => {
                 ) : (
                   <div>
                     <p className="text-gray-300 mb-4">
-                      Click and drag to select a crop area. The crop frame can be 2:1 (landscape) or
-                      1:2 (portrait) aspect ratio to match your OLED display orientation.
+                      Click and drag to select a crop area. Click inside an existing crop to
+                      reposition it. The crop frame maintains a 2:1 (landscape) or 1:2 (portrait)
+                      aspect ratio to match your OLED display orientation.
                     </p>
 
                     <div className="relative inline-block border-2 border-gray-600 rounded-lg bg-gray-900 p-2">

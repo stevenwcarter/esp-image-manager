@@ -1,6 +1,7 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import Button from 'components/Button';
+import { useEffect, useState, useRef, useCallback, ChangeEvent } from 'react';
 import { useDropzone } from 'react-dropzone';
-import CanvasDraw from 'react-canvas-draw';
+import { ReactSketchCanvas, ReactSketchCanvasRef } from 'react-sketch-canvas';
 // Import the default initialization function and the specific Rust functions
 import init, { preview, greet } from 'wasm-image-preview';
 
@@ -9,6 +10,9 @@ const WasmImagePreview = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
   const [uploadedImage, setUploadedImage] = useState<HTMLImageElement | null>(null);
+  const [eraseMode, setEraseMode] = useState(false);
+  const [strokeWidth, setStrokeWidth] = useState(5);
+  const [eraserWidth, setEraserWidth] = useState(10);
   const [cropArea, setCropArea] = useState<{
     x: number;
     y: number;
@@ -16,16 +20,31 @@ const WasmImagePreview = () => {
     height: number;
   } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasDrawRef = useRef<CanvasDraw>(null);
+  const canvasDrawRef = useRef<ReactSketchCanvasRef>(null);
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const handleEraserClick = () => {
+    setEraseMode(true);
+    canvasDrawRef.current?.eraseMode(true);
+  };
+
+  const handlePenClick = () => {
+    setEraseMode(false);
+    canvasDrawRef.current?.eraseMode(false);
+  };
+
+  const handleStrokeWidthChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setStrokeWidth(+event.target.value);
+  };
+
+  const handleEraserWidthChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setEraserWidth(+event.target.value);
+  };
 
   // Constants
   const DISPLAY_WIDTH = 128;
   const DISPLAY_HEIGHT = 64;
-  const DRAW_CANVAS_WIDTH = 512;
-  const DRAW_CANVAS_HEIGHT = 256;
 
   // 1. Initialize Wasm module on mount
   useEffect(() => {
@@ -77,46 +96,63 @@ const WasmImagePreview = () => {
   };
 
   // Convert canvas to image data and process through WASM
-  const processCanvasImage = async (canvas: HTMLCanvasElement) => {
-    if (!isWasmLoaded) return;
-
-    try {
-      // Create a temporary canvas at the target resolution
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = DISPLAY_WIDTH;
-      tempCanvas.height = DISPLAY_HEIGHT;
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) return;
-
-      // Draw the source canvas to the temporary canvas, scaled down
-      tempCtx.drawImage(canvas, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-
-      // Convert canvas to PNG blob, then to array buffer for WASM
-      tempCanvas.toBlob(async (blob) => {
-        if (!blob) return;
-
-        const arrayBuffer = await blob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-
-        // Process through WASM with actual PNG data
-        const packedResult = preview(uint8Array);
-        drawPackedImage(packedResult);
-      }, 'image/png');
-    } catch (err) {
-      console.error('Error processing canvas:', err);
-      setError('Error processing drawing');
-    }
-  };
+  // const processCanvasImage = async (dataString: string) => {
+  //   if (!isWasmLoaded) return;
+  //
+  //   try {
+  //     // Create a temporary canvas at the target resolution
+  //     const tempCanvas = document.createElement('canvas');
+  //     tempCanvas.width = DISPLAY_WIDTH;
+  //     tempCanvas.height = DISPLAY_HEIGHT;
+  //     const tempCtx = tempCanvas.getContext('2d');
+  //     if (!tempCtx) return;
+  //
+  //     // Draw the source canvas to the temporary canvas, scaled down
+  //     tempCtx.drawImage(dataString, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+  //
+  //     // Convert canvas to PNG blob, then to array buffer for WASM
+  //     tempCanvas.toBlob(async (blob) => {
+  //       if (!blob) return;
+  //
+  //       const arrayBuffer = await blob.arrayBuffer();
+  //       const uint8Array = new Uint8Array(arrayBuffer);
+  //
+  //       // Process through WASM with actual PNG data
+  //       const packedResult = preview(uint8Array);
+  //       drawPackedImage(packedResult);
+  //     }, 'image/png');
+  //   } catch (err) {
+  //     console.error('Error processing canvas:', err);
+  //     setError('Error processing drawing');
+  //   }
+  // };
 
   // Handle drawing canvas changes
   const handleDrawingChange = async () => {
     if (!canvasDrawRef.current || !isWasmLoaded) return;
 
-    const canvas = (canvasDrawRef.current as any).canvas.drawing;
-    console.log(canvas);
-    if (canvas) {
-      await processCanvasImage(canvas);
+    const dataURL = await canvasDrawRef.current.exportImage('jpeg');
+    // 1. Split the Data URL to separate the metadata from the base64 data.
+    // The format is typically "data:[<mediatype>][;base64],<data>"
+    const parts = dataURL.split(',');
+    const base64Data = parts[1]; // Get the base64 encoded data part
+
+    // 2. Decode the base64 string into a binary string.
+    // `atob()` is used for base64 decoding in browsers.
+    const binaryString = atob(base64Data);
+
+    // 3. Create a Uint8Array from the binary string.
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
+
+    if (!isWasmLoaded) return;
+
+    // Process through WASM with actual PNG data
+    const packedResult = preview(bytes);
+    drawPackedImage(packedResult);
   };
 
   // Handle file drop
@@ -333,24 +369,78 @@ const WasmImagePreview = () => {
                   Draw on the canvas below. Your drawing will be processed in real-time to show how
                   it would appear on the 128x64 OLED display.
                 </p>
-
+                <div className="flex flex-column gap-2 p-2">
+                  <h1>Tools</h1>
+                  <div className="flex gap-2 align-items-center">
+                    <Button disabled={!eraseMode} onClick={handlePenClick}>
+                      Pen
+                    </Button>
+                    <Button
+                      className="btn btn-sm btn-outline-primary"
+                      disabled={eraseMode}
+                      onClick={handleEraserClick}
+                    >
+                      Eraser
+                    </Button>
+                    <label htmlFor="strokeWidth" className="form-label">
+                      Stroke width
+                    </label>
+                    <input
+                      disabled={eraseMode}
+                      type="range"
+                      className="form-range"
+                      min="1"
+                      max="20"
+                      step="1"
+                      id="strokeWidth"
+                      value={strokeWidth}
+                      onChange={handleStrokeWidthChange}
+                    />
+                    <label htmlFor="eraserWidth" className="form-label">
+                      Eraser width
+                    </label>
+                    <input
+                      disabled={!eraseMode}
+                      type="range"
+                      className="form-range"
+                      min="1"
+                      max="20"
+                      step="1"
+                      id="eraserWidth"
+                      value={eraserWidth}
+                      onChange={handleEraserWidthChange}
+                    />
+                  </div>
+                </div>
                 <div className="border-2 border-gray-600 rounded-lg p-4 bg-gray-900">
-                  <CanvasDraw
+                  <ReactSketchCanvas
                     ref={canvasDrawRef}
-                    canvasWidth={DRAW_CANVAS_WIDTH}
-                    canvasHeight={DRAW_CANVAS_HEIGHT}
-                    brushRadius={2}
-                    brushColor="#ffffff"
-                    backgroundColor="#000000"
+                    strokeWidth={strokeWidth}
+                    eraserWidth={eraserWidth}
+                    width={'512px'}
+                    height={'256px'}
+                    strokeColor="#FFFFFF"
+                    canvasColor="#000000"
                     onChange={handleDrawingChange}
-                    disabled={!isWasmLoaded}
                     className="border border-gray-600 bg-black"
+                    style={{ touchAction: 'none' }}
                   />
+                  {/* <CanvasDraw */}
+                  {/*   ref={canvasDrawRef} */}
+                  {/*   canvasWidth={DRAW_CANVAS_WIDTH} */}
+                  {/*   canvasHeight={DRAW_CANVAS_HEIGHT} */}
+                  {/*   brushRadius={2} */}
+                  {/*   brushColor="#ffffff" */}
+                  {/*   backgroundColor="#000000" */}
+                  {/*   onChange={handleDrawingChange} */}
+                  {/*   disabled={!isWasmLoaded} */}
+                  {/*   className="border border-gray-600 bg-black" */}
+                  {/* /> */}
                 </div>
 
                 <div className="mt-4 flex gap-2">
                   <button
-                    onClick={() => canvasDrawRef.current?.clear()}
+                    onClick={() => canvasDrawRef.current?.clearCanvas()}
                     className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!isWasmLoaded}
                   >

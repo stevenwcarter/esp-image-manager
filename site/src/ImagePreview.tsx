@@ -281,13 +281,6 @@ const WasmImagePreview = () => {
     if (!canvas) return;
 
     try {
-      // Create a temporary canvas for the cropped area
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = DISPLAY_WIDTH;
-      tempCanvas.height = DISPLAY_HEIGHT;
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) return;
-
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
@@ -298,15 +291,32 @@ const WasmImagePreview = () => {
       const grabHeight = Math.abs(cropArea.height);
       const imageData = ctx.getImageData(grabX, grabY, grabWidth, grabHeight);
 
+      // Determine if this is a portrait or landscape crop based on aspect ratio
+      const isPortrait = grabHeight > grabWidth;
+
+      // Create a temporary canvas for the cropped area with correct orientation
+      const tempCanvas = document.createElement('canvas');
+      if (isPortrait) {
+        // Portrait: 64x128 (will be rotated by the previewer)
+        tempCanvas.width = DISPLAY_HEIGHT; // 64
+        tempCanvas.height = DISPLAY_WIDTH; // 128
+      } else {
+        // Landscape: 128x64
+        tempCanvas.width = DISPLAY_WIDTH; // 128
+        tempCanvas.height = DISPLAY_HEIGHT; // 64
+      }
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
+
       // Draw the cropped data to temp canvas, scaled to display dimensions
       const croppedCanvas = document.createElement('canvas');
-      croppedCanvas.width = Math.abs(cropArea.width);
-      croppedCanvas.height = Math.abs(cropArea.height);
+      croppedCanvas.width = grabWidth;
+      croppedCanvas.height = grabHeight;
       const croppedCtx = croppedCanvas.getContext('2d');
       if (!croppedCtx) return;
 
       croppedCtx.putImageData(imageData, 0, 0);
-      tempCtx.drawImage(croppedCanvas, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
+      tempCtx.drawImage(croppedCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
 
       // Convert canvas to PNG blob, then to array buffer for WASM
       tempCanvas.toBlob(async (blob) => {

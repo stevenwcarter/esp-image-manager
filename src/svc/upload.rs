@@ -23,6 +23,7 @@ impl UploadSvc {
         let offset: i64 = offset.into();
 
         uploads::table
+            .filter(uploads::public.eq(true))
             .select(Upload::as_select())
             .order_by(uploads::uuid.asc())
             .limit(limit)

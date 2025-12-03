@@ -240,22 +240,22 @@ const WasmImagePreview = () => {
     if (!canvas) return;
 
     const rect = canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    const currentX = e.clientX - (rect.left < rect.right ? rect.left : rect.right);
+    const currentY = e.clientY - (rect.top < rect.bottom ? rect.top : rect.bottom);
 
-    const width = Math.abs(currentX - cropArea.x);
-    const height = Math.abs(currentY - cropArea.y);
+    const width = currentX - cropArea.x;
+    const height = currentY - cropArea.y;
 
     // Determine if we should use 2:1 or 1:2 aspect ratio based on drag direction
     let newWidth: number, newHeight: number;
-    if (width > height) {
+    if (Math.abs(width) > Math.abs(height)) {
       // Landscape: maintain 2:1 ratio
       newWidth = width;
-      newHeight = width / 2;
+      newHeight = height > 0 ? Math.abs(width) / 2 : -(Math.abs(width) / 2);
     } else {
       // Portrait: maintain 1:2 ratio
       newHeight = height;
-      newWidth = height / 2;
+      newWidth = width > 0 ? Math.abs(height) / 2 : -(Math.abs(height) / 2);
     }
 
     setCropArea({ ...cropArea, width: newWidth, height: newHeight });
@@ -264,7 +264,7 @@ const WasmImagePreview = () => {
   const handleCanvasMouseUp = () => {
     setIsDrawing(false);
 
-    if (cropArea && cropArea.width > 0 && cropArea.height > 0) {
+    if (cropArea && cropArea.width != 0 && cropArea.height != 0) {
       processCroppedImage();
     }
   };
@@ -287,12 +287,16 @@ const WasmImagePreview = () => {
       if (!ctx) return;
 
       // Get the cropped image data
-      const imageData = ctx.getImageData(cropArea.x, cropArea.y, cropArea.width, cropArea.height);
+      const grabX = cropArea.width < 0 ? cropArea.x + cropArea.width : cropArea.x;
+      const grabY = cropArea.height < 0 ? cropArea.y + cropArea.height : cropArea.y;
+      const grabWidth = Math.abs(cropArea.width);
+      const grabHeight = Math.abs(cropArea.height);
+      const imageData = ctx.getImageData(grabX, grabY, grabWidth, grabHeight);
 
       // Draw the cropped data to temp canvas, scaled to display dimensions
       const croppedCanvas = document.createElement('canvas');
-      croppedCanvas.width = cropArea.width;
-      croppedCanvas.height = cropArea.height;
+      croppedCanvas.width = Math.abs(cropArea.width);
+      croppedCanvas.height = Math.abs(cropArea.height);
       const croppedCtx = croppedCanvas.getContext('2d');
       if (!croppedCtx) return;
 
@@ -315,6 +319,24 @@ const WasmImagePreview = () => {
       setError('Error processing cropped image');
     }
   };
+
+  const style = {} as React.CSSProperties;
+  if (cropArea) {
+    // style.left = cropArea.x + 8;
+    // style.top = cropArea.y + 8;
+    style.width = cropArea.width;
+    style.height = cropArea.height;
+    if (cropArea.width < 0) {
+      style.right = cropArea.x + 8;
+    } else {
+      style.left = cropArea.x + 8;
+    }
+    if (cropArea.height < 0) {
+      style.bottom = cropArea.y + 8;
+    } else {
+      style.top = cropArea.y + 8;
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
@@ -515,7 +537,7 @@ const WasmImagePreview = () => {
 
                       {cropArea && cropArea.width > 0 && cropArea.height > 0 && (
                         <div
-                          className="absolute border-2 border-blue-500 bg-blue-200 bg-opacity-30 pointer-events-none"
+                          className="absolute border-2 border-blue-500 bg-blue-200/30 pointer-events-none"
                           style={{
                             left: cropArea.x + 8, // Account for padding
                             top: cropArea.y + 8, // Account for padding
@@ -539,7 +561,7 @@ const WasmImagePreview = () => {
                       <button
                         onClick={processCroppedImage}
                         className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={!cropArea || cropArea.width <= 0}
+                        disabled={!cropArea}
                       >
                         Process Crop
                       </button>

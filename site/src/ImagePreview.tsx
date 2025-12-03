@@ -2,7 +2,6 @@ import Button from 'components/Button';
 import { useEffect, useState, useRef, useCallback, ChangeEvent } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { ReactSketchCanvas, ReactSketchCanvasRef } from 'react-sketch-canvas';
-import useDebounce from 'hooks/useDebounce';
 // Import the default initialization function and the specific Rust functions
 import init, { preview, greet } from 'wasm-image-preview';
 
@@ -27,8 +26,8 @@ const WasmImagePreview = () => {
   const canvasDrawRef = useRef<ReactSketchCanvasRef>(null);
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Debounce crop area changes for preview updates
-  const debouncedCropArea = useDebounce(cropArea, 100);
+  // Throttle preview updates to at most once per 100ms
+  const lastUpdateTime = useRef<number>(0);
 
   const handleEraserClick = () => {
     setEraseMode(true);
@@ -52,12 +51,16 @@ const WasmImagePreview = () => {
   const DISPLAY_WIDTH = 128;
   const DISPLAY_HEIGHT = 64;
 
-  // Process crop area changes with debounce
-  useEffect(() => {
-    if (debouncedCropArea && debouncedCropArea.width !== 0 && debouncedCropArea.height !== 0) {
-      processCroppedImage();
+  // Throttled preview update function
+  const throttledProcessCrop = useCallback(() => {
+    const now = Date.now();
+    if (now - lastUpdateTime.current >= 100) {
+      lastUpdateTime.current = now;
+      if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
+        processCroppedImage();
+      }
     }
-  }, [debouncedCropArea]);
+  }, [cropArea]);
 
   // 1. Initialize Wasm module on mount
   useEffect(() => {
@@ -139,13 +142,6 @@ const WasmImagePreview = () => {
   //     setError('Error processing drawing');
   //   }
   // };
-
-  // Process crop area changes with debounce
-  useEffect(() => {
-    if (debouncedCropArea && debouncedCropArea.width !== 0 && debouncedCropArea.height !== 0) {
-      processCroppedImage();
-    }
-  }, [debouncedCropArea]);
 
   // Handle drawing canvas changes
   const handleDrawingChange = async () => {
@@ -282,6 +278,7 @@ const WasmImagePreview = () => {
       const newX = currentX - dragOffset.x;
       const newY = currentY - dragOffset.y;
       setCropArea({ ...cropArea, x: newX, y: newY });
+      throttledProcessCrop();
       return;
     }
 
@@ -308,12 +305,18 @@ const WasmImagePreview = () => {
       newWidth = widthSign * (absHeight / 2);
     }
     setCropArea({ ...cropArea, width: newWidth, height: newHeight });
+    throttledProcessCrop();
   };
 
   const handleCanvasMouseUp = () => {
     setIsDrawing(false);
     setIsDragging(false);
     setDragOffset({ x: 0, y: 0 });
+
+    // Ensure final state is processed
+    if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
+      processCroppedImage();
+    }
   };
 
   const processCroppedImage = async () => {

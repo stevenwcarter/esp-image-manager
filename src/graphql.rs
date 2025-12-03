@@ -1,4 +1,5 @@
 use juniper::{EmptySubscription, FieldError, FieldResult, RootNode};
+use uuid::Uuid;
 
 use crate::{
     context::GraphQLContext,
@@ -11,8 +12,8 @@ pub struct Query;
 #[juniper::graphql_object(context = GraphQLContext)]
 impl Query {
     // Uploads
-    pub async fn get_upload(context: &GraphQLContext, upload_id: i32) -> FieldResult<Upload> {
-        graphql_translate_anyhow(UploadSvc::get(context, upload_id))
+    pub async fn get_upload(context: &GraphQLContext, upload_uuid: Uuid) -> FieldResult<Upload> {
+        graphql_translate_anyhow(UploadSvc::get(context, upload_uuid))
     }
     pub fn list_uploads(
         context: &GraphQLContext,
@@ -30,21 +31,11 @@ pub struct Mutation;
 #[juniper::graphql_object(context = GraphQLContext)]
 impl Mutation {
     // Uploads
-    pub async fn create_client(
+    pub async fn create_upload(
         context: &GraphQLContext,
-        client: UploadInput,
+        upload: UploadInput,
     ) -> FieldResult<Upload> {
-        graphql_translate_anyhow(UploadSvc::create(context, &client.into()))
-    }
-    pub async fn update_client(
-        context: &GraphQLContext,
-        client: UploadInput,
-    ) -> FieldResult<Upload> {
-        graphql_translate_anyhow(UploadSvc::update(context, &client.into()))
-    }
-    pub async fn delete_client(context: &GraphQLContext, upload_id: i32) -> FieldResult<bool> {
-        graphql_translate_anyhow(UploadSvc::delete(context, upload_id))?;
-        Ok(true)
+        graphql_translate_anyhow(UploadSvc::create(context, &upload.into()))
     }
 }
 

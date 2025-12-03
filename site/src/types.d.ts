@@ -4,3 +4,8 @@ export type Upload = {
   data: string;
   uploadedAt?: string;
 };
+
+export type UploadInput = {
+  message?: string;
+  data: string;
+};

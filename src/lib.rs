@@ -14,6 +14,7 @@ pub mod models;
 pub mod routes;
 pub mod schema;
 pub mod svc;
+pub mod uuid;
 
 // pub(crate) fn format_millis(millis: i64) -> String {
 //     let secs = millis / 1000;

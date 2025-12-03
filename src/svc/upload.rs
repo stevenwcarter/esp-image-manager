@@ -1,13 +1,14 @@
-use crate::{context::GraphQLContext, db::get_conn, models::Upload, schema::uploads};
+use crate::{context::GraphQLContext, db::get_conn, models::Upload, schema::uploads, uuid::UUID};
 use anyhow::{Context, Result};
 use diesel::prelude::*;
+use uuid::Uuid;
 
 pub struct UploadSvc {}
 
 impl UploadSvc {
-    pub fn get(context: &GraphQLContext, upload_id: i32) -> Result<Upload> {
+    pub fn get(context: &GraphQLContext, upload_uuid: Uuid) -> Result<Upload> {
         uploads::table
-            .filter(uploads::id.eq(upload_id))
+            .filter(uploads::uuid.eq(UUID::from(&upload_uuid)))
             // .select(Upload::as_select())
             .first(&mut get_conn(context))
             .context("Could not find upload")
@@ -18,7 +19,7 @@ impl UploadSvc {
 
         uploads::table
             .select(Upload::as_select())
-            .order_by(uploads::id.asc())
+            .order_by(uploads::uuid.asc())
             .limit(limit)
             .offset(offset)
             .load::<Upload>(&mut get_conn(context))
@@ -30,20 +31,20 @@ impl UploadSvc {
             .execute(&mut get_conn(context))
             .context("Could not update upload")?;
 
-        Self::get(context, upload.id)
+        Self::get(context, upload.uuid.into())
     }
     pub fn update(context: &GraphQLContext, upload: &Upload) -> Result<Upload> {
         diesel::update(uploads::table)
-            .filter(uploads::id.eq(&upload.id))
+            .filter(uploads::uuid.eq(&upload.uuid))
             .set(upload)
             .execute(&mut get_conn(context))
             .context("Could not update upload")?;
 
-        Self::get(context, upload.id)
+        Self::get(context, upload.uuid.into())
     }
-    pub fn delete(context: &GraphQLContext, upload_id: i32) -> Result<()> {
+    pub fn delete(context: &GraphQLContext, upload_uuid: Uuid) -> Result<()> {
         diesel::delete(uploads::table)
-            .filter(uploads::id.eq(upload_id))
+            .filter(uploads::uuid.eq(UUID::from(&upload_uuid)))
             .execute(&mut get_conn(context))
             .context("Could not delete upload")?;
 

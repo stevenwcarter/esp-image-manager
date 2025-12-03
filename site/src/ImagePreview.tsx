@@ -1,10 +1,13 @@
-import Button from 'components/Button';
 import { useUploads } from 'hooks/useUploads';
-import { useEffect, useState, useRef, useCallback, ChangeEvent } from 'react';
-import { useDropzone } from 'react-dropzone';
-import { ReactSketchCanvas, ReactSketchCanvasRef } from 'react-sketch-canvas';
+import { useEffect, useState, useRef } from 'react';
 // Import the default initialization function and the specific Rust functions
 import init, { preview } from 'wasm-image-preview';
+
+// Component imports
+import DrawingCanvas from 'components/DrawingCanvas';
+import ImageUploadCrop from 'components/ImageUploadCrop';
+import DisplayPreview, { DisplayPreviewRef } from 'components/DisplayPreview';
+import SubmitModal from 'components/SubmitModal';
 
 const WasmImagePreview = () => {
   const { createUpload } = useUploads();
@@ -12,25 +15,16 @@ const WasmImagePreview = () => {
   const [isWasmLoaded, setIsWasmLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
-  const [uploadedImage, setUploadedImage] = useState<HTMLImageElement | null>(null);
-  const [eraseMode, setEraseMode] = useState(false);
-  const [strokeWidth, setStrokeWidth] = useState(5);
-  const [eraserWidth, setEraserWidth] = useState(10);
-  const [cropArea, setCropArea] = useState<{
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasDrawRef = useRef<ReactSketchCanvasRef>(null);
-  const imageCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const displayPreviewRef = useRef<DisplayPreviewRef>(null);
 
   const handleSubmit = () => {
     if (!isWasmLoaded || !uploadData) return;
+    setIsModalOpen(true);
+  };
+
+  const handleModalSubmit = (message: string, isPublic: boolean) => {
+    if (!uploadData) return;
 
     if (!(Uint8Array.prototype as any).toBase64) {
       (Uint8Array.prototype as any).toBase64 = function () {
@@ -44,135 +38,35 @@ const WasmImagePreview = () => {
     }
 
     createUpload({
-      message: 'WASM Test Upload',
+      message: message,
+      data: (uploadData as any).toBase64(),
+      public: isPublic,
+    });
+  };
+  const handleQuickSubmit = () => {
+    if (!uploadData) return;
+
+    if (!(Uint8Array.prototype as any).toBase64) {
+      (Uint8Array.prototype as any).toBase64 = function () {
+        let binary = '';
+        const len = this.length;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(this[i]);
+        }
+        return btoa(binary);
+      };
+    }
+
+    createUpload({
       data: (uploadData as any).toBase64(),
       public: true,
     });
   };
 
-  // Throttle preview updates to at most once per 100ms
-  const lastUpdateTime = useRef<number>(0);
+  // Handle drawing updates from DrawingCanvas
+  const handleDrawingChange = async (dataURL: string) => {
+    if (!isWasmLoaded) return;
 
-  const handleEraserClick = () => {
-    setEraseMode(true);
-    canvasDrawRef.current?.eraseMode(true);
-  };
-
-  const handlePenClick = () => {
-    setEraseMode(false);
-    canvasDrawRef.current?.eraseMode(false);
-  };
-
-  const handleStrokeWidthChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setStrokeWidth(+event.target.value);
-  };
-
-  const handleEraserWidthChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setEraserWidth(+event.target.value);
-  };
-
-  // Constants
-  const DISPLAY_WIDTH = 128;
-  const DISPLAY_HEIGHT = 64;
-
-  // Throttled preview update function
-  const throttledProcessCrop = useCallback(() => {
-    const now = Date.now();
-    if (now - lastUpdateTime.current >= 100) {
-      lastUpdateTime.current = now;
-      if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
-        processCroppedImage();
-      }
-    }
-  }, [cropArea]);
-
-  // 1. Initialize Wasm module on mount
-  useEffect(() => {
-    init()
-      .then(() => setIsWasmLoaded(true))
-      .catch((err) => {
-        console.error('Error loading Wasm:', err);
-        setError('Failed to load Wasm module');
-      });
-  }, []);
-
-  // Helper: Unpack 1-bit data to RGBA for Canvas
-  const drawPackedImage = (packedData: Uint8Array) => {
-    setUploadData(packedData);
-    const canvas = previewCanvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const imageData = ctx.createImageData(DISPLAY_WIDTH, DISPLAY_HEIGHT);
-
-    let pixelIndex = 0;
-
-    // Iterate through every byte in the packed buffer
-    for (const byte of packedData) {
-      // Iterate through 8 bits per byte (from MSB to LSB)
-      for (let bit = 7; bit >= 0; bit--) {
-        // Stop if we exceed expected pixels
-        if (pixelIndex >= DISPLAY_WIDTH * DISPLAY_HEIGHT) break;
-
-        // Check if the specific bit is set
-        const isWhite = (byte >> bit) & 1;
-
-        // Calculate position in the Canvas ImageData (4 bytes per pixel: R, G, B, A)
-        const dataIndex = pixelIndex * 4;
-
-        // Set pixel color based on bit (0 = Black, 1 = White)
-        const color = isWhite ? 0 : 255;
-
-        imageData.data[dataIndex] = color; // R
-        imageData.data[dataIndex + 1] = color; // G
-        imageData.data[dataIndex + 2] = color; // B
-        imageData.data[dataIndex + 3] = 255; // Alpha (Opaque)
-
-        pixelIndex++;
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-  };
-
-  // Convert canvas to image data and process through WASM
-  // const processCanvasImage = async (dataString: string) => {
-  //   if (!isWasmLoaded) return;
-  //
-  //   try {
-  //     // Create a temporary canvas at the target resolution
-  //     const tempCanvas = document.createElement('canvas');
-  //     tempCanvas.width = DISPLAY_WIDTH;
-  //     tempCanvas.height = DISPLAY_HEIGHT;
-  //     const tempCtx = tempCanvas.getContext('2d');
-  //     if (!tempCtx) return;
-  //
-  //     // Draw the source canvas to the temporary canvas, scaled down
-  //     tempCtx.drawImage(dataString, 0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT);
-  //
-  //     // Convert canvas to PNG blob, then to array buffer for WASM
-  //     tempCanvas.toBlob(async (blob) => {
-  //       if (!blob) return;
-  //
-  //       const arrayBuffer = await blob.arrayBuffer();
-  //       const uint8Array = new Uint8Array(arrayBuffer);
-  //
-  //       // Process through WASM with actual PNG data
-  //       const packedResult = preview(uint8Array);
-  //       drawPackedImage(packedResult);
-  //     }, 'image/png');
-  //   } catch (err) {
-  //     console.error('Error processing canvas:', err);
-  //     setError('Error processing drawing');
-  //   }
-  // };
-
-  // Handle drawing canvas changes
-  const handleDrawingChange = async () => {
-    if (!canvasDrawRef.current || !isWasmLoaded) return;
-
-    const dataURL = await canvasDrawRef.current.exportImage('jpeg');
     // 1. Split the Data URL to separate the metadata from the base64 data.
     // The format is typically "data:[<mediatype>][;base64],<data>"
     const parts = dataURL.split(',');
@@ -189,236 +83,26 @@ const WasmImagePreview = () => {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    if (!isWasmLoaded) return;
-
     // Process through WASM with actual PNG data
     const packedResult = preview(bytes);
-    drawPackedImage(packedResult);
+    handleImageProcessed(packedResult);
   };
 
-  // Handle file drop
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
+  // Handle processed image from both drawing and upload components
+  const handleImageProcessed = (packedData: Uint8Array) => {
+    setUploadData(packedData);
+    displayPreviewRef.current?.drawPackedImage(packedData);
+  };
 
-    const img = new Image();
-    img.onload = () => {
-      setUploadedImage(img);
-      setCropArea(null);
-    };
-
-    img.onerror = (imgError) => {
-      console.error('Image failed to load:', imgError);
-      setError('Failed to load image');
-    };
-
-    img.src = URL.createObjectURL(file);
-  }, []);
-
-  // Draw uploaded image on canvas when it changes
+  // 1. Initialize Wasm module on mount
   useEffect(() => {
-    if (uploadedImage && imageCanvasRef.current) {
-      const canvas = imageCanvasRef.current;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        console.log('Canvas found:', canvas.width, 'x', canvas.height);
-        console.log('Image loaded:', uploadedImage.width, 'x', uploadedImage.height);
-
-        // Calculate dimensions to fit the image in the canvas while maintaining aspect ratio
-        const canvasAspect = canvas.width / canvas.height;
-        const imgAspect = uploadedImage.width / uploadedImage.height;
-
-        let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
-
-        if (imgAspect > canvasAspect) {
-          drawWidth = canvas.width;
-          drawHeight = canvas.width / imgAspect;
-          offsetX = 0;
-          offsetY = (canvas.height - drawHeight) / 2;
-        } else {
-          drawHeight = canvas.height;
-          drawWidth = canvas.height * imgAspect;
-          offsetX = (canvas.width - drawWidth) / 2;
-          offsetY = 0;
-        }
-
-        // Clear canvas first
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        console.log('Drawing image at:', offsetX, offsetY, 'size:', drawWidth, drawHeight);
-        ctx.drawImage(uploadedImage, offsetX, offsetY, drawWidth, drawHeight);
-      } else {
-        console.error('Could not get canvas context');
-      }
-    }
-  }, [uploadedImage]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.bmp', '.webp'],
-    },
-    multiple: false,
-  });
-
-  // Handle crop area selection
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = imageCanvasRef.current;
-    if (!canvas || !uploadedImage) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    // Check if clicking inside existing crop rectangle
-    if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
-      const cropLeft = cropArea.width < 0 ? cropArea.x + cropArea.width : cropArea.x;
-      const cropTop = cropArea.height < 0 ? cropArea.y + cropArea.height : cropArea.y;
-      const cropRight = cropLeft + Math.abs(cropArea.width);
-      const cropBottom = cropTop + Math.abs(cropArea.height);
-
-      if (x >= cropLeft && x <= cropRight && y >= cropTop && y <= cropBottom) {
-        // Start dragging existing crop rectangle
-        setIsDragging(true);
-        setDragOffset({ x: x - cropArea.x, y: y - cropArea.y });
-        return;
-      }
-    }
-
-    // Start creating new crop rectangle
-    setIsDrawing(true);
-    setCropArea({ x, y, width: 0, height: 0 });
-  };
-
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = imageCanvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
-
-    if (isDragging && cropArea) {
-      // Dragging existing crop rectangle
-      const newX = currentX - dragOffset.x;
-      const newY = currentY - dragOffset.y;
-      setCropArea({ ...cropArea, x: newX, y: newY });
-      throttledProcessCrop();
-      return;
-    }
-
-    if (!isDrawing || !cropArea) return;
-
-    const width = currentX - cropArea.x;
-    const height = currentY - cropArea.y;
-
-    // Determine if we should use 2:1 or 1:2 aspect ratio based on drag direction
-    // Use absolute values to determine aspect ratio, then preserve individual signs
-    const absWidth = Math.abs(width);
-    const absHeight = Math.abs(height);
-    const widthSign = Math.sign(width);
-    const heightSign = Math.sign(height);
-
-    let newWidth: number, newHeight: number;
-    if (absWidth > absHeight) {
-      // Landscape: maintain 2:1 ratio (width is dominant)
-      newWidth = widthSign * absWidth;
-      newHeight = heightSign * (absWidth / 2);
-    } else {
-      // Portrait: maintain 1:2 ratio (height is dominant)
-      newHeight = heightSign * absHeight;
-      newWidth = widthSign * (absHeight / 2);
-    }
-    setCropArea({ ...cropArea, width: newWidth, height: newHeight });
-    throttledProcessCrop();
-  };
-
-  const handleCanvasMouseUp = () => {
-    setIsDrawing(false);
-    setIsDragging(false);
-    setDragOffset({ x: 0, y: 0 });
-
-    // Ensure final state is processed
-    if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
-      processCroppedImage();
-    }
-  };
-
-  const processCroppedImage = async () => {
-    if (!uploadedImage || !cropArea || !isWasmLoaded) return;
-
-    const canvas = imageCanvasRef.current;
-    if (!canvas) return;
-
-    try {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // Get the cropped image data
-      const grabX = cropArea.width < 0 ? cropArea.x + cropArea.width : cropArea.x;
-      const grabY = cropArea.height < 0 ? cropArea.y + cropArea.height : cropArea.y;
-      const grabWidth = Math.abs(cropArea.width);
-      const grabHeight = Math.abs(cropArea.height);
-      const imageData = ctx.getImageData(grabX, grabY, grabWidth, grabHeight);
-
-      // Determine if this is a portrait or landscape crop based on aspect ratio
-      const isPortrait = grabHeight > grabWidth;
-
-      // Create a temporary canvas for the cropped area with correct orientation
-      const tempCanvas = document.createElement('canvas');
-      if (isPortrait) {
-        // Portrait: 64x128 (will be rotated by the previewer)
-        tempCanvas.width = DISPLAY_HEIGHT; // 64
-        tempCanvas.height = DISPLAY_WIDTH; // 128
-      } else {
-        // Landscape: 128x64
-        tempCanvas.width = DISPLAY_WIDTH; // 128
-        tempCanvas.height = DISPLAY_HEIGHT; // 64
-      }
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) return;
-
-      // Draw the cropped data to temp canvas, scaled to display dimensions
-      const croppedCanvas = document.createElement('canvas');
-      croppedCanvas.width = grabWidth;
-      croppedCanvas.height = grabHeight;
-      const croppedCtx = croppedCanvas.getContext('2d');
-      if (!croppedCtx) return;
-
-      croppedCtx.putImageData(imageData, 0, 0);
-      tempCtx.drawImage(croppedCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
-
-      // Convert canvas to PNG blob, then to array buffer for WASM
-      tempCanvas.toBlob(async (blob) => {
-        if (!blob) return;
-
-        const arrayBuffer = await blob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-
-        // Process through WASM with actual PNG data
-        const packedResult = preview(uint8Array);
-        drawPackedImage(packedResult);
-      }, 'image/png');
-    } catch (err) {
-      console.error('Error processing cropped image:', err);
-      setError('Error processing cropped image');
-    }
-  };
-
-  const style = {} as React.CSSProperties;
-  if (cropArea) {
-    style.width = Math.abs(cropArea.width);
-    style.height = Math.abs(cropArea.height);
-
-    // Calculate the top-left corner of the rectangle
-    const rectLeft = cropArea.width < 0 ? cropArea.x + cropArea.width : cropArea.x;
-    const rectTop = cropArea.height < 0 ? cropArea.y + cropArea.height : cropArea.y;
-
-    style.left = rectLeft + 8; // 8px offset for the canvas padding
-    style.top = rectTop + 8;
-  }
-  console.log(cropArea);
-  console.log('Crop area style:', style);
+    init()
+      .then(() => setIsWasmLoaded(true))
+      .catch((err) => {
+        console.error('Error loading Wasm:', err);
+        setError('Failed to load Wasm module');
+      });
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-900 p-6">
@@ -467,230 +151,36 @@ const WasmImagePreview = () => {
           {/* Main Content Area */}
           <div className="lg:col-span-2">
             {activeTab === 'draw' && (
-              <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
-                <h2 className="text-xl font-semibold text-white mb-4">Drawing Canvas</h2>
-                <p className="text-gray-300 mb-4">
-                  Draw on the canvas below. Your drawing will be processed in real-time to show how
-                  it would appear on the 128x64 OLED display.
-                </p>
-                <div className="flex flex-column gap-2 p-2">
-                  <h1>Tools</h1>
-                  <div className="flex gap-2 align-items-center">
-                    <Button disabled={!eraseMode} onClick={handlePenClick}>
-                      Pen
-                    </Button>
-                    <Button
-                      className="btn btn-sm btn-outline-primary"
-                      disabled={eraseMode}
-                      onClick={handleEraserClick}
-                    >
-                      Eraser
-                    </Button>
-                    <label htmlFor="strokeWidth" className="form-label">
-                      Stroke width
-                    </label>
-                    <input
-                      disabled={eraseMode}
-                      type="range"
-                      className="form-range"
-                      min="1"
-                      max="20"
-                      step="1"
-                      id="strokeWidth"
-                      value={strokeWidth}
-                      onChange={handleStrokeWidthChange}
-                    />
-                    <label htmlFor="eraserWidth" className="form-label">
-                      Eraser width
-                    </label>
-                    <input
-                      disabled={!eraseMode}
-                      type="range"
-                      className="form-range"
-                      min="1"
-                      max="20"
-                      step="1"
-                      id="eraserWidth"
-                      value={eraserWidth}
-                      onChange={handleEraserWidthChange}
-                    />
-                  </div>
-                </div>
-                <div className="border-2 border-gray-600 rounded-lg p-4 bg-gray-900">
-                  <ReactSketchCanvas
-                    ref={canvasDrawRef}
-                    strokeWidth={strokeWidth}
-                    eraserWidth={eraserWidth}
-                    width={'512px'}
-                    height={'256px'}
-                    strokeColor="#FFFFFF"
-                    canvasColor="#000000"
-                    onChange={handleDrawingChange}
-                    className="border border-gray-600 bg-black"
-                    style={{ touchAction: 'none' }}
-                  />
-                  {/* <CanvasDraw */}
-                  {/*   ref={canvasDrawRef} */}
-                  {/*   canvasWidth={DRAW_CANVAS_WIDTH} */}
-                  {/*   canvasHeight={DRAW_CANVAS_HEIGHT} */}
-                  {/*   brushRadius={2} */}
-                  {/*   brushColor="#ffffff" */}
-                  {/*   backgroundColor="#000000" */}
-                  {/*   onChange={handleDrawingChange} */}
-                  {/*   disabled={!isWasmLoaded} */}
-                  {/*   className="border border-gray-600 bg-black" */}
-                  {/* /> */}
-                </div>
-
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => canvasDrawRef.current?.clearCanvas()}
-                    className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!isWasmLoaded}
-                  >
-                    Clear Canvas
-                  </button>
-                  <button
-                    onClick={() => canvasDrawRef.current?.undo()}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!isWasmLoaded}
-                  >
-                    Undo
-                  </button>
-                </div>
-              </div>
+              <DrawingCanvas isWasmLoaded={isWasmLoaded} onDrawingChange={handleDrawingChange} />
             )}
 
             {activeTab === 'upload' && (
-              <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6">
-                <h2 className="text-xl font-semibold text-white mb-4">Upload & Crop Image</h2>
-
-                {!uploadedImage ? (
-                  <div
-                    {...getRootProps()}
-                    className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
-                      isDragActive
-                        ? 'border-blue-400 bg-blue-900'
-                        : 'border-gray-600 hover:border-gray-500'
-                    }`}
-                  >
-                    <input {...getInputProps()} />
-                    <div className="mx-auto w-16 h-16 mb-4 text-gray-500">
-                      <svg
-                        fill="currentColor"
-                        viewBox="0 0 20 20"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          fillRule="evenodd"
-                          d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    </div>
-                    {isDragActive ? (
-                      <p className="text-blue-400 font-medium">Drop the image here...</p>
-                    ) : (
-                      <div>
-                        <p className="text-white font-medium mb-2">
-                          Drop an image here, or click to select
-                        </p>
-                        <p className="text-gray-400 text-sm">Supports JPG, PNG, GIF, BMP, WebP</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-gray-300 mb-4">
-                      Click and drag to select a crop area. Click inside an existing crop to
-                      reposition it. The crop frame maintains a 2:1 (landscape) or 1:2 (portrait)
-                      aspect ratio to match your OLED display orientation.
-                    </p>
-
-                    <div className="relative inline-block border-2 border-gray-600 rounded-lg bg-gray-900 p-2">
-                      <canvas
-                        ref={imageCanvasRef}
-                        width={400}
-                        height={300}
-                        className="cursor-crosshair bg-gray-800"
-                        onMouseDown={handleCanvasMouseDown}
-                        onMouseMove={handleCanvasMouseMove}
-                        onMouseUp={handleCanvasMouseUp}
-                      />
-
-                      {cropArea && cropArea.width != 0 && cropArea.height != 0 && (
-                        <div
-                          className="absolute border-2 border-blue-500 bg-blue-200/30 pointer-events-none"
-                          style={style}
-                        />
-                      )}
-                    </div>
-
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => {
-                          setUploadedImage(null);
-                          setCropArea(null);
-                        }}
-                        className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
-                      >
-                        Upload Different Image
-                      </button>
-                      <button
-                        onClick={processCroppedImage}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={!cropArea}
-                      >
-                        Process Crop
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <ImageUploadCrop
+                onImageProcessed={handleImageProcessed}
+                isWasmLoaded={isWasmLoaded}
+                preview={preview}
+              />
             )}
           </div>
 
           {/* Preview Panel */}
           <div className="lg:col-span-1">
-            <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6 sticky top-6">
-              <h3 className="text-lg font-semibold text-white mb-4">OLED Display Preview</h3>
-              <p className="text-gray-300 text-sm mb-4">
-                This shows how your image will appear on the 128x64 monochrome OLED display.
-              </p>
-
-              <div className="flex justify-center">
-                <div className="bg-black p-4 rounded-lg">
-                  <canvas
-                    ref={previewCanvasRef}
-                    width={DISPLAY_WIDTH}
-                    height={DISPLAY_HEIGHT}
-                    className="border border-gray-600 bg-black"
-                    style={{
-                      imageRendering: 'pixelated',
-                      width: '256px',
-                      height: '128px',
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="mt-4 text-center">
-                <span className="text-xs text-gray-400">128 × 64 pixels</span>
-              </div>
-
-              {/* Test WASM Button */}
-              <div className="mt-6 pt-4 border-t border-gray-700">
-                <button
-                  onClick={handleSubmit}
-                  className="w-full px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!isWasmLoaded}
-                >
-                  Submit
-                </button>
-              </div>
-            </div>
+            <DisplayPreview
+              ref={displayPreviewRef}
+              isWasmLoaded={isWasmLoaded}
+              onSubmit={handleSubmit}
+              onQuickSubmit={handleQuickSubmit}
+            />
           </div>
         </div>
+
+        {/* Submit Modal */}
+        <SubmitModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={handleModalSubmit}
+          getPreviewImageData={() => displayPreviewRef.current?.getImageData() || null}
+        />
       </div>
     </div>
   );

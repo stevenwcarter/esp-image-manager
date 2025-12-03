@@ -16,9 +16,9 @@ RUN cargo build --release
 FROM scratch
 WORKDIR /
 COPY --from=builder /home/rust/src/target/x86_64-unknown-linux-musl/release/image-manager image-manager
-COPY env.prod .env
+# COPY env.prod .env
 COPY site/build ./site/build
-COPY config.toml.prod-docker config.toml
+# COPY config.toml.prod-docker config.toml
 
 EXPOSE 4000
 

@@ -15,7 +15,9 @@ export const useUploads = () => {
   const [createUploadMutation] = useMutation<CreateUploadResponse>(CREATE_UPLOAD_GQL, {
     refetchQueries: [LIST_UPLOADS_GQL],
   });
-  const { data } = useQuery<ListUploadResponse>(LIST_UPLOADS_GQL);
+  const { data } = useQuery<ListUploadResponse>(LIST_UPLOADS_GQL, {
+    pollInterval: 30000, // Refresh every 30 seconds
+  });
 
   useEffect(() => {
     if (data && data.listUploads) {

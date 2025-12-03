@@ -3,6 +3,7 @@
 #![allow(unused)]
 #![allow(clippy::all)]
 
+use crate::svc::packed_to_png;
 use anyhow::Result;
 use bigdecimal::{FromPrimitive, ToPrimitive};
 use chrono::NaiveDateTime;
@@ -41,6 +42,10 @@ impl Upload {
     }
     pub fn public(&self) -> bool {
         self.public
+    }
+    pub async fn png(&self) -> String {
+        let png_data = packed_to_png(self).await.expect("Could not convert to png");
+        format!("data:image/png;base64,{}", base64::encode(&png_data))
     }
 }
 

@@ -18,6 +18,7 @@ export const LIST_UPLOADS_GQL = gql`
       message
       data
       uploadedAt
+      png
     }
   }
 `;

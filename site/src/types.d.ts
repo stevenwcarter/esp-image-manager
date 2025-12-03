@@ -3,6 +3,7 @@ export type Upload = {
   message?: string;
   data: string;
   uploadedAt?: string;
+  png?: string;
 };
 
 export type UploadInput = {

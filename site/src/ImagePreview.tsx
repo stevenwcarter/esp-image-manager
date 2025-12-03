@@ -8,13 +8,14 @@ import DrawingCanvas from 'components/DrawingCanvas';
 import ImageUploadCrop from 'components/ImageUploadCrop';
 import DisplayPreview, { DisplayPreviewRef } from 'components/DisplayPreview';
 import SubmitModal from 'components/SubmitModal';
+import Gallery from 'components/Gallery';
 
 const WasmImagePreview = () => {
-  const { createUpload } = useUploads();
+  const { uploads, createUpload } = useUploads();
   const [uploadData, setUploadData] = useState<Uint8Array | null>(null);
   const [isWasmLoaded, setIsWasmLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
+  const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('upload');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const displayPreviewRef = useRef<DisplayPreviewRef>(null);
 
@@ -125,16 +126,6 @@ const WasmImagePreview = () => {
         <div className="border-b border-gray-700 mb-6">
           <nav className="-mb-px flex space-x-8">
             <button
-              onClick={() => setActiveTab('draw')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'draw'
-                  ? 'border-blue-400 text-blue-400'
-                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
-              }`}
-            >
-              Draw Mode
-            </button>
-            <button
               onClick={() => setActiveTab('upload')}
               className={`py-2 px-1 border-b-2 font-medium text-sm ${
                 activeTab === 'upload'
@@ -143,6 +134,16 @@ const WasmImagePreview = () => {
               }`}
             >
               Upload Mode
+            </button>
+            <button
+              onClick={() => setActiveTab('draw')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'draw'
+                  ? 'border-blue-400 text-blue-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'
+              }`}
+            >
+              Draw Mode
             </button>
           </nav>
         </div>
@@ -173,6 +174,9 @@ const WasmImagePreview = () => {
             />
           </div>
         </div>
+
+        {/* Gallery */}
+        <Gallery uploads={uploads} />
 
         {/* Submit Modal */}
         <SubmitModal

@@ -1,3 +1,3 @@
 mod upload;
 
-pub use upload::UploadSvc;
+pub use upload::*;

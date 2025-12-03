@@ -18,7 +18,6 @@ const WasmImagePreview = () => {
     y: number;
     width: number;
     height: number;
-    flipped?: boolean;
   } | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -242,28 +241,28 @@ const WasmImagePreview = () => {
 
     const rect = canvas.getBoundingClientRect();
     const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.right;
+    const currentY = e.clientY - rect.top;
 
-    if (currentX > cropArea.y) {
-      cropArea.flipped = false;
-    } else {
-      cropArea.flipped = true;
-    }
-    const width = !cropArea.flipped ? currentX - cropArea.x : cropArea.x - currentX;
-    const height = !cropArea.flipped ? currentY - cropArea.y : cropArea.y - currentY;
+    const width = currentX - cropArea.x;
+    const height = currentY - cropArea.y;
 
     // Determine if we should use 2:1 or 1:2 aspect ratio based on drag direction
-    let newWidth: number, newHeight: number;
-    if (width > height) {
-      // Landscape: maintain 2:1 ratio
-      newWidth = width;
-      newHeight = width / 2;
-    } else {
-      // Portrait: maintain 1:2 ratio
-      newHeight = height;
-      newWidth = height / 2;
-    }
+    // Use absolute values to determine aspect ratio, then preserve individual signs
+    const absWidth = Math.abs(width);
+    const absHeight = Math.abs(height);
+    const widthSign = Math.sign(width);
+    const heightSign = Math.sign(height);
 
+    let newWidth: number, newHeight: number;
+    if (absWidth > absHeight) {
+      // Landscape: maintain 2:1 ratio (width is dominant)
+      newWidth = widthSign * absWidth;
+      newHeight = heightSign * (absWidth / 2);
+    } else {
+      // Portrait: maintain 1:2 ratio (height is dominant)
+      newHeight = heightSign * absHeight;
+      newWidth = widthSign * (absHeight / 2);
+    }
     setCropArea({ ...cropArea, width: newWidth, height: newHeight });
   };
 
@@ -328,20 +327,15 @@ const WasmImagePreview = () => {
 
   const style = {} as React.CSSProperties;
   if (cropArea) {
-    // style.left = cropArea.x + 8;
-    // style.top = cropArea.y + 8;
     style.width = Math.abs(cropArea.width);
     style.height = Math.abs(cropArea.height);
-    if (cropArea.width < 0) {
-      style.right = cropArea.x + 8;
-    } else {
-      style.left = cropArea.x + 8;
-    }
-    if (cropArea.height < 0) {
-      style.bottom = cropArea.y + 8;
-    } else {
-      style.top = cropArea.y + 8;
-    }
+
+    // Calculate the top-left corner of the rectangle
+    const rectLeft = cropArea.width < 0 ? cropArea.x + cropArea.width : cropArea.x;
+    const rectTop = cropArea.height < 0 ? cropArea.y + cropArea.height : cropArea.y;
+
+    style.left = rectLeft + 8; // 8px offset for the canvas padding
+    style.top = rectTop + 8;
   }
   console.log(cropArea);
   console.log('Crop area style:', style);

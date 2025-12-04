@@ -3,14 +3,14 @@
 
 export function greet(name: string): void;
 
-export function preview(image_data: Uint8Array): Uint8Array;
+export function preview(image_data: Uint8Array, black_threshold?: number | null, white_threshold?: number | null): Uint8Array;
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly greet: (a: number, b: number) => void;
-  readonly preview: (a: number, b: number) => [number, number];
+  readonly preview: (a: number, b: number, c: number, d: number) => [number, number];
   readonly __wbindgen_externrefs: WebAssembly.Table;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_free: (a: number, b: number, c: number) => void;

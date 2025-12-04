@@ -18,6 +18,10 @@ function getUint8ArrayMemory0() {
     return cachedUint8ArrayMemory0;
 }
 
+function isLikeNone(x) {
+    return x === undefined || x === null;
+}
+
 function passArray8ToWasm0(arg, malloc) {
     const ptr = malloc(arg.length * 1, 1) >>> 0;
     getUint8ArrayMemory0().set(arg, ptr / 1);
@@ -102,12 +106,14 @@ export function greet(name) {
 
 /**
  * @param {Uint8Array} image_data
+ * @param {number | null} [black_threshold]
+ * @param {number | null} [white_threshold]
  * @returns {Uint8Array}
  */
-export function preview(image_data) {
+export function preview(image_data, black_threshold, white_threshold) {
     const ptr0 = passArray8ToWasm0(image_data, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
-    const ret = wasm.preview(ptr0, len0);
+    const ret = wasm.preview(ptr0, len0, isLikeNone(black_threshold) ? 0x100000001 : (black_threshold) >> 0, isLikeNone(white_threshold) ? 0x100000001 : (white_threshold) >> 0);
     var v2 = getArrayU8FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 1, 1);
     return v2;

@@ -11,11 +11,13 @@ interface CropArea {
 interface ImageUploadCropProps {
   onImageProcessed: (packedData: Uint8Array) => void;
   isWasmLoaded: boolean;
-  preview: (bytes: Uint8Array) => Uint8Array;
+  preview: (bytes: Uint8Array, black?: number, white?: number) => Uint8Array;
 }
 
 const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploadCropProps) => {
   const [uploadedImage, setUploadedImage] = useState<HTMLImageElement | null>(null);
+  const [black, setBlack] = useState(10);
+  const [white, setWhite] = useState(245);
   const [cropArea, setCropArea] = useState<CropArea | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -59,7 +61,8 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         const uint8Array = new Uint8Array(arrayBuffer);
 
         // Process through WASM with actual PNG data - let WASM handle padding
-        const packedResult = preview(uint8Array);
+        console.log('Black: ', black, ' White: ', white);
+        const packedResult = preview(uint8Array, black, white);
         onImageProcessed(packedResult);
       }, 'image/png');
     } catch (err) {
@@ -67,6 +70,15 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
       setError('Error processing full image');
     }
   }, [uploadedImage, isWasmLoaded, preview, onImageProcessed]);
+
+  useEffect(() => {
+    if (!cropArea) {
+      console.log('Processing full image due to no crop area', black, white);
+      processFullImage();
+    } else {
+      processCroppedImage();
+    }
+  }, [black, white]);
 
   const processCroppedImage = useCallback(async () => {
     const currentCropArea = cropAreaRef.current;
@@ -145,7 +157,7 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         const uint8Array = new Uint8Array(arrayBuffer);
 
         // Process through WASM with actual PNG data - let WASM handle scaling/padding
-        const packedResult = preview(uint8Array);
+        const packedResult = preview(uint8Array, black, white);
         onImageProcessed(packedResult);
       }, 'image/png');
     } catch (err) {
@@ -452,6 +464,30 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
             >
               {aspectRatioLocked ? '🔒 Aspect Ratio Locked' : '🔓 Free Crop'}
             </button>
+            <div className="mt-4 flex items-center gap-4">
+              <label className="text-gray-300" htmlFor="black_level">
+                Black Level: {black}
+              </label>
+              <input
+                id="black_level"
+                type="range"
+                min="0"
+                max="255"
+                value={black}
+                onChange={(e) => setBlack(Number(e.target.value))}
+              />
+              <label className="text-gray-300" htmlFor="white_level">
+                White Level: {white}
+              </label>
+              <input
+                id="white_level"
+                type="range"
+                min="0"
+                max="255"
+                value={white}
+                onChange={(e) => setWhite(Number(e.target.value))}
+              />
+            </div>
           </div>
 
           <div className="relative inline-block border-2 border-gray-600 rounded-lg bg-gray-900 p-2">

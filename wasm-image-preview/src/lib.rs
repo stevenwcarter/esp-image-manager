@@ -64,8 +64,17 @@ fn resize_and_pad(mut img: DynamicImage) -> Result<DynamicImage> {
 }
 
 #[wasm_bindgen]
-pub fn preview(image_data: Vec<u8>) -> Vec<u8> {
-    match convert_format(image_data) {
+pub fn preview(
+    image_data: Vec<u8>,
+    black_threshold: Option<i32>,
+    white_threshold: Option<i32>,
+) -> Vec<u8> {
+    console::log_1(
+        &format!("Black: {:?} White: {:?}", black_threshold, white_threshold)
+            .as_str()
+            .into(),
+    );
+    match convert_format(image_data, black_threshold, white_threshold) {
         Ok(image) => image,
         Err(e) => {
             let message = format!("Error generating preview: {:?}", e);
@@ -75,14 +84,40 @@ pub fn preview(image_data: Vec<u8>) -> Vec<u8> {
     }
 }
 
-fn convert_format(image_data: Vec<u8>) -> Result<Vec<u8>> {
+fn convert_format(
+    image_data: Vec<u8>,
+    black_threshold: Option<i32>,
+    white_threshold: Option<i32>,
+) -> Result<Vec<u8>> {
     let cursor = Cursor::new(image_data);
     let img = ImageReader::new(cursor).with_guessed_format()?.decode()?;
     let img = resize_and_pad(img).context("could not resize")?;
 
     let gray_img = img.to_luma8();
 
-    let mut pixels: Vec<f32> = gray_img.pixels().map(|p| p.0[0] as f32).collect();
+    let mut pixels: Vec<f32> = gray_img
+        .pixels()
+        .map(|p| p.0[0] as f32)
+        .map(|p| {
+            // unwrapping to default 0 and 255 effectively means "do nothing"
+            // if the threshold is None, which is safe.
+            let b = black_threshold.unwrap_or(0) as f32;
+            let w = white_threshold.unwrap_or(255) as f32;
+
+            // Prevent division by zero if thresholds are crossed or identical
+            if w <= b {
+                return p;
+            }
+
+            // 1. Shift black to 0
+            // 2. Scale the remaining range to fit 0-255
+            let new_val = (p - b) / (w - b) * 255.0;
+
+            // 3. Clamp to ensure we don't go below 0 or above 255
+            // (This handles the hard clipping for values outside the thresholds)
+            new_val.clamp(0.0, 255.0)
+        })
+        .collect();
 
     let get_idx = |x: u32, y: u32| -> usize { (y * WIDTH + x) as usize };
 

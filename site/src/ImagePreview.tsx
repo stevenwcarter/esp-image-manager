@@ -85,7 +85,7 @@ const WasmImagePreview = () => {
     }
 
     // Process through WASM with actual PNG data
-    const packedResult = preview(bytes);
+    const packedResult = preview(bytes, 0, 255);
     handleImageProcessed(packedResult);
   };
 

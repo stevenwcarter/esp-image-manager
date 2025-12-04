@@ -1,5 +1,5 @@
 export type Upload = {
-  id: number;
+  uuid: string;
   message?: string;
   data: string;
   uploadedAt?: string;

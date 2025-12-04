@@ -47,7 +47,7 @@ const Gallery = ({ uploads }: GalleryProps) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
           {recentUploads.map((upload) => (
             <div
-              key={upload.id}
+              key={upload.uuid}
               className="bg-gray-900 rounded-lg p-4 border border-gray-600 hover:border-gray-500 transition-colors min-w-0"
             >
               <div className="flex justify-center mb-3">
@@ -55,7 +55,7 @@ const Gallery = ({ uploads }: GalleryProps) => {
                   {upload.png ? (
                     <img
                       src={upload.png}
-                      alt={`Upload ${upload.id}`}
+                      alt={`Upload ${upload.uuid}`}
                       className="border border-gray-600 bg-black"
                       style={{
                         imageRendering: 'pixelated',

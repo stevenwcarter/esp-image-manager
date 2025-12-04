@@ -161,14 +161,46 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
     multiple: false,
   });
 
-  // Handle crop area selection
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Helper function to get coordinates from mouse or touch event
+  const getEventCoordinates = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+  ) => {
+    const canvas = imageCanvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+
+    const rect = canvas.getBoundingClientRect();
+
+    if ('touches' in e) {
+      // Touch event
+      if (e.touches.length > 0) {
+        return {
+          x: e.touches[0].clientX - rect.left,
+          y: e.touches[0].clientY - rect.top,
+        };
+      }
+      return { x: 0, y: 0 };
+    } else {
+      // Mouse event
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+    }
+  };
+
+  // Unified handler for starting crop area selection (mouse and touch)
+  const handleCropStart = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+  ) => {
     const canvas = imageCanvasRef.current;
     if (!canvas || !uploadedImage) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // Prevent default touch behavior (scrolling, zooming)
+    if ('touches' in e) {
+      e.preventDefault();
+    }
+
+    const { x, y } = getEventCoordinates(e);
 
     // Check if clicking inside existing crop rectangle
     if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
@@ -190,13 +222,19 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
     setCropArea({ x, y, width: 0, height: 0 });
   };
 
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Unified handler for crop area movement (mouse and touch)
+  const handleCropMove = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+  ) => {
     const canvas = imageCanvasRef.current;
     if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    // Prevent default touch behavior (scrolling, zooming)
+    if ('touches' in e) {
+      e.preventDefault();
+    }
+
+    const { x: currentX, y: currentY } = getEventCoordinates(e);
 
     if (isDragging && cropArea) {
       // Dragging existing crop rectangle
@@ -233,7 +271,8 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
     throttledProcessCrop();
   };
 
-  const handleCanvasMouseUp = () => {
+  // Unified handler for ending crop area selection (mouse and touch)
+  const handleCropEnd = () => {
     setIsDrawing(false);
     setIsDragging(false);
     setDragOffset({ x: 0, y: 0 });
@@ -242,6 +281,32 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
     if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
       processCroppedImage();
     }
+  };
+
+  // Mouse event handlers (delegate to unified handlers)
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    handleCropStart(e);
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    handleCropMove(e);
+  };
+
+  const handleCanvasMouseUp = () => {
+    handleCropEnd();
+  };
+
+  // Touch event handlers (delegate to unified handlers)
+  const handleCanvasTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    handleCropStart(e);
+  };
+
+  const handleCanvasTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    handleCropMove(e);
+  };
+
+  const handleCanvasTouchEnd = () => {
+    handleCropEnd();
   };
 
   const style = {} as React.CSSProperties;
@@ -297,19 +362,21 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         <div>
           <p className="text-gray-300 mb-4">
             Click and drag to select a crop area. Click inside an existing crop to reposition it.
-            The crop frame maintains a 2:1 (landscape) or 1:2 (portrait) aspect ratio to match your
-            OLED display orientation.
           </p>
 
           <div className="relative inline-block border-2 border-gray-600 rounded-lg bg-gray-900 p-2">
             <canvas
               ref={imageCanvasRef}
-              width={400}
-              height={300}
+              width={300}
+              height={150}
               className="cursor-crosshair bg-gray-800"
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}
               onMouseUp={handleCanvasMouseUp}
+              onTouchStart={handleCanvasTouchStart}
+              onTouchMove={handleCanvasTouchMove}
+              onTouchEnd={handleCanvasTouchEnd}
+              style={{ touchAction: 'none' }}
             />
 
             {cropArea && cropArea.width != 0 && cropArea.height != 0 && (

@@ -31,13 +31,57 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
   // const DISPLAY_WIDTH = 128;
   // const DISPLAY_HEIGHT = 64;
 
-  // Throttle preview updates to at most once per 100ms
-  const lastUpdateTime = useRef<number>(0);
+  // Throttle preview updates to at most once per 200ms
+  const lastPreviewTime = useRef<number>(0);
+  const pendingPreviewCall = useRef<any>(null);
 
   // Keep ref in sync with state
   useEffect(() => {
     cropAreaRef.current = cropArea;
   }, [cropArea]);
+
+  // Throttled preview function
+  const throttledPreview = useCallback(
+    (uint8Array: Uint8Array, blackValue: number, whiteValue: number) => {
+      const now = Date.now();
+      const timeSinceLastCall = now - lastPreviewTime.current;
+
+      const executePreview = () => {
+        console.log('Black: ', blackValue, ' White: ', whiteValue);
+        const packedResult = preview(uint8Array, blackValue, whiteValue);
+        onImageProcessed(packedResult);
+        lastPreviewTime.current = Date.now();
+      };
+
+      if (timeSinceLastCall >= 200) {
+        // Enough time has passed, execute immediately
+        if (pendingPreviewCall.current) {
+          clearTimeout(pendingPreviewCall.current);
+          pendingPreviewCall.current = null;
+        }
+        executePreview();
+      } else {
+        // Schedule for later if not already scheduled
+        if (!pendingPreviewCall.current) {
+          const delay = 200 - timeSinceLastCall;
+          pendingPreviewCall.current = setTimeout(() => {
+            pendingPreviewCall.current = null;
+            executePreview();
+          }, delay);
+        }
+      }
+    },
+    [preview, onImageProcessed],
+  );
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (pendingPreviewCall.current) {
+        clearTimeout(pendingPreviewCall.current);
+      }
+    };
+  }, []);
 
   const processFullImage = useCallback(async () => {
     if (!uploadedImage || !isWasmLoaded) return;
@@ -61,15 +105,13 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         const uint8Array = new Uint8Array(arrayBuffer);
 
         // Process through WASM with actual PNG data - let WASM handle padding
-        console.log('Black: ', black, ' White: ', white);
-        const packedResult = preview(uint8Array, black, white);
-        onImageProcessed(packedResult);
+        throttledPreview(uint8Array, black, white);
       }, 'image/png');
     } catch (err) {
       console.error('Error processing full image:', err);
       setError('Error processing full image');
     }
-  }, [uploadedImage, isWasmLoaded, preview, onImageProcessed]);
+  }, [uploadedImage, isWasmLoaded, throttledPreview]);
 
   useEffect(() => {
     if (!cropArea) {
@@ -157,20 +199,20 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         const uint8Array = new Uint8Array(arrayBuffer);
 
         // Process through WASM with actual PNG data - let WASM handle scaling/padding
-        const packedResult = preview(uint8Array, black, white);
-        onImageProcessed(packedResult);
+        throttledPreview(uint8Array, black, white);
       }, 'image/png');
     } catch (err) {
       console.error('Error processing cropped image:', err);
       setError('Error processing cropped image');
     }
-  }, [uploadedImage, isWasmLoaded, preview, onImageProcessed]);
+  }, [uploadedImage, isWasmLoaded, throttledPreview]);
 
   // Throttled preview update function
   const throttledProcessCrop = useCallback(() => {
     const now = Date.now();
-    if (now - lastUpdateTime.current >= 100) {
-      lastUpdateTime.current = now;
+    if (now - lastPreviewTime.current >= 200) {
+      console.log(now, lastPreviewTime.current);
+      lastPreviewTime.current = now;
       const currentCropArea = cropAreaRef.current;
       if (currentCropArea && currentCropArea.width !== 0 && currentCropArea.height !== 0) {
         processCroppedImage();

@@ -21,58 +21,35 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [error, setError] = useState<string | null>(null);
+  const [aspectRatioLocked, setAspectRatioLocked] = useState(true);
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cropAreaRef = useRef<CropArea | null>(null);
 
   // Constants
-  const DISPLAY_WIDTH = 128;
-  const DISPLAY_HEIGHT = 64;
+  // const DISPLAY_WIDTH = 128;
+  // const DISPLAY_HEIGHT = 64;
 
   // Throttle preview updates to at most once per 100ms
   const lastUpdateTime = useRef<number>(0);
 
-  const processCroppedImage = useCallback(async () => {
-    if (!uploadedImage || !cropArea || !isWasmLoaded) return;
+  // Keep ref in sync with state
+  useEffect(() => {
+    cropAreaRef.current = cropArea;
+  }, [cropArea]);
 
-    const canvas = imageCanvasRef.current;
-    if (!canvas) return;
+  const processFullImage = useCallback(async () => {
+    if (!uploadedImage || !isWasmLoaded) return;
 
     try {
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // Get the cropped image data
-      const grabX = cropArea.width < 0 ? cropArea.x + cropArea.width : cropArea.x;
-      const grabY = cropArea.height < 0 ? cropArea.y + cropArea.height : cropArea.y;
-      const grabWidth = Math.abs(cropArea.width);
-      const grabHeight = Math.abs(cropArea.height);
-      const imageData = ctx.getImageData(grabX, grabY, grabWidth, grabHeight);
-
-      // Determine if this is a portrait or landscape crop based on aspect ratio
-      const isPortrait = grabHeight > grabWidth;
-
-      // Create a temporary canvas for the cropped area with correct orientation
+      // Create a temporary canvas with the original image dimensions
       const tempCanvas = document.createElement('canvas');
-      if (isPortrait) {
-        // Portrait: 64x128 (will be rotated by the previewer)
-        tempCanvas.width = DISPLAY_HEIGHT; // 64
-        tempCanvas.height = DISPLAY_WIDTH; // 128
-      } else {
-        // Landscape: 128x64
-        tempCanvas.width = DISPLAY_WIDTH; // 128
-        tempCanvas.height = DISPLAY_HEIGHT; // 64
-      }
+      tempCanvas.width = uploadedImage.width;
+      tempCanvas.height = uploadedImage.height;
       const tempCtx = tempCanvas.getContext('2d');
       if (!tempCtx) return;
 
-      // Draw the cropped data to temp canvas, scaled to display dimensions
-      const croppedCanvas = document.createElement('canvas');
-      croppedCanvas.width = grabWidth;
-      croppedCanvas.height = grabHeight;
-      const croppedCtx = croppedCanvas.getContext('2d');
-      if (!croppedCtx) return;
-
-      croppedCtx.putImageData(imageData, 0, 0);
-      tempCtx.drawImage(croppedCanvas, 0, 0, tempCanvas.width, tempCanvas.height);
+      // Draw the full uploaded image at original size (no scaling/squashing)
+      tempCtx.drawImage(uploadedImage, 0, 0);
 
       // Convert canvas to PNG blob, then to array buffer for WASM
       tempCanvas.toBlob(async (blob) => {
@@ -81,7 +58,93 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         const arrayBuffer = await blob.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
 
-        // Process through WASM with actual PNG data
+        // Process through WASM with actual PNG data - let WASM handle padding
+        const packedResult = preview(uint8Array);
+        onImageProcessed(packedResult);
+      }, 'image/png');
+    } catch (err) {
+      console.error('Error processing full image:', err);
+      setError('Error processing full image');
+    }
+  }, [uploadedImage, isWasmLoaded, preview, onImageProcessed]);
+
+  const processCroppedImage = useCallback(async () => {
+    const currentCropArea = cropAreaRef.current;
+    if (!uploadedImage || !currentCropArea || !isWasmLoaded) return;
+
+    const canvas = imageCanvasRef.current;
+    if (!canvas) return;
+
+    try {
+      // Calculate how the image is displayed in the canvas (same logic as useEffect)
+      const canvasAspect = canvas.width / canvas.height;
+      const imgAspect = uploadedImage.width / uploadedImage.height;
+
+      let drawWidth: number, drawHeight: number, offsetX: number, offsetY: number;
+
+      if (imgAspect > canvasAspect) {
+        drawWidth = canvas.width;
+        drawHeight = canvas.width / imgAspect;
+        offsetX = 0;
+        offsetY = (canvas.height - drawHeight) / 2;
+      } else {
+        drawHeight = canvas.height;
+        drawWidth = canvas.height * imgAspect;
+        offsetX = (canvas.width - drawWidth) / 2;
+        offsetY = 0;
+      }
+
+      // Convert canvas crop coordinates to original image coordinates
+      const grabX =
+        currentCropArea.width < 0 ? currentCropArea.x + currentCropArea.width : currentCropArea.x;
+      const grabY =
+        currentCropArea.height < 0 ? currentCropArea.y + currentCropArea.height : currentCropArea.y;
+      const grabWidth = Math.abs(currentCropArea.width);
+      const grabHeight = Math.abs(currentCropArea.height);
+
+      // Convert canvas coordinates to image coordinates
+      const scaleX = uploadedImage.width / drawWidth;
+      const scaleY = uploadedImage.height / drawHeight;
+
+      const imgCropX = (grabX - offsetX) * scaleX;
+      const imgCropY = (grabY - offsetY) * scaleY;
+      const imgCropWidth = grabWidth * scaleX;
+      const imgCropHeight = grabHeight * scaleY;
+
+      // Clamp coordinates to image boundaries
+      const clampedX = Math.max(0, Math.min(imgCropX, uploadedImage.width));
+      const clampedY = Math.max(0, Math.min(imgCropY, uploadedImage.height));
+      const clampedWidth = Math.max(1, Math.min(imgCropWidth, uploadedImage.width - clampedX));
+      const clampedHeight = Math.max(1, Math.min(imgCropHeight, uploadedImage.height - clampedY));
+
+      // Create a canvas with the cropped portion at original resolution
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = clampedWidth;
+      tempCanvas.height = clampedHeight;
+      const tempCtx = tempCanvas.getContext('2d');
+      if (!tempCtx) return;
+
+      // Draw the cropped portion from the original image (not scaled)
+      tempCtx.drawImage(
+        uploadedImage,
+        clampedX,
+        clampedY,
+        clampedWidth,
+        clampedHeight, // source crop from original image
+        0,
+        0,
+        clampedWidth,
+        clampedHeight, // destination on temp canvas
+      );
+
+      // Convert canvas to PNG blob, then to array buffer for WASM
+      tempCanvas.toBlob(async (blob) => {
+        if (!blob) return;
+
+        const arrayBuffer = await blob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        // Process through WASM with actual PNG data - let WASM handle scaling/padding
         const packedResult = preview(uint8Array);
         onImageProcessed(packedResult);
       }, 'image/png');
@@ -89,18 +152,19 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
       console.error('Error processing cropped image:', err);
       setError('Error processing cropped image');
     }
-  }, [uploadedImage, cropArea, isWasmLoaded, preview, onImageProcessed]);
+  }, [uploadedImage, isWasmLoaded, preview, onImageProcessed]);
 
   // Throttled preview update function
   const throttledProcessCrop = useCallback(() => {
     const now = Date.now();
     if (now - lastUpdateTime.current >= 100) {
       lastUpdateTime.current = now;
-      if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
+      const currentCropArea = cropAreaRef.current;
+      if (currentCropArea && currentCropArea.width !== 0 && currentCropArea.height !== 0) {
         processCroppedImage();
       }
     }
-  }, [cropArea, processCroppedImage]);
+  }, [processCroppedImage]);
 
   // Handle file drop
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -122,7 +186,7 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
     img.src = URL.createObjectURL(file);
   }, []);
 
-  // Draw uploaded image on canvas when it changes
+  // Draw uploaded image on canvas when it changes and process full image
   useEffect(() => {
     if (uploadedImage && imageCanvasRef.current) {
       const canvas = imageCanvasRef.current;
@@ -149,6 +213,9 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         // Clear canvas first
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(uploadedImage, offsetX, offsetY, drawWidth, drawHeight);
+
+        // Process the full image for preview when first loaded
+        setTimeout(() => processFullImage(), 0);
       }
     }
   }, [uploadedImage]);
@@ -250,23 +317,31 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
     const width = currentX - cropArea.x;
     const height = currentY - cropArea.y;
 
-    // Determine if we should use 2:1 or 1:2 aspect ratio based on drag direction
-    // Use absolute values to determine aspect ratio, then preserve individual signs
-    const absWidth = Math.abs(width);
-    const absHeight = Math.abs(height);
-    const widthSign = Math.sign(width);
-    const heightSign = Math.sign(height);
-
     let newWidth: number, newHeight: number;
-    if (absWidth > absHeight) {
-      // Landscape: maintain 2:1 ratio (width is dominant)
-      newWidth = widthSign * absWidth;
-      newHeight = heightSign * (absWidth / 2);
+
+    if (aspectRatioLocked) {
+      // Determine if we should use 2:1 or 1:2 aspect ratio based on drag direction
+      // Use absolute values to determine aspect ratio, then preserve individual signs
+      const absWidth = Math.abs(width);
+      const absHeight = Math.abs(height);
+      const widthSign = Math.sign(width);
+      const heightSign = Math.sign(height);
+
+      if (absWidth > absHeight) {
+        // Landscape: maintain 2:1 ratio (width is dominant)
+        newWidth = widthSign * absWidth;
+        newHeight = heightSign * (absWidth / 2);
+      } else {
+        // Portrait: maintain 1:2 ratio (height is dominant)
+        newHeight = heightSign * absHeight;
+        newWidth = widthSign * (absHeight / 2);
+      }
     } else {
-      // Portrait: maintain 1:2 ratio (height is dominant)
-      newHeight = heightSign * absHeight;
-      newWidth = widthSign * (absHeight / 2);
+      // Free-form crop when aspect ratio is unlocked
+      newWidth = width;
+      newHeight = height;
     }
+
     setCropArea({ ...cropArea, width: newWidth, height: newHeight });
     throttledProcessCrop();
   };
@@ -277,10 +352,13 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
     setIsDragging(false);
     setDragOffset({ x: 0, y: 0 });
 
-    // Ensure final state is processed
-    if (cropArea && cropArea.width !== 0 && cropArea.height !== 0) {
-      processCroppedImage();
-    }
+    // Ensure final state is processed with a small delay to avoid conflicts
+    setTimeout(() => {
+      const currentCropArea = cropAreaRef.current;
+      if (currentCropArea && currentCropArea.width !== 0 && currentCropArea.height !== 0) {
+        processCroppedImage();
+      }
+    }, 50);
   };
 
   // Mouse event handlers (delegate to unified handlers)
@@ -360,9 +438,21 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         </div>
       ) : (
         <div>
-          <p className="text-gray-300 mb-4">
-            Click and drag to select a crop area. Click inside an existing crop to reposition it.
-          </p>
+          <div className="mb-4">
+            <p className="text-gray-300 mb-2">
+              Click and drag to select a crop area. Click inside an existing crop to reposition it.
+            </p>
+            <button
+              onClick={() => setAspectRatioLocked(!aspectRatioLocked)}
+              className={`px-3 py-1 text-sm rounded-md border transition-colors ${
+                aspectRatioLocked
+                  ? 'bg-yellow-700 border-yellow-600 text-yellow-100 hover:bg-yellow-600'
+                  : 'bg-green-700 border-green-600 text-green-100 hover:bg-green-600'
+              }`}
+            >
+              {aspectRatioLocked ? '🔒 Aspect Ratio Locked' : '🔓 Free Crop'}
+            </button>
+          </div>
 
           <div className="relative inline-block border-2 border-gray-600 rounded-lg bg-gray-900 p-2">
             <canvas
@@ -388,6 +478,16 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
           </div>
 
           <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => {
+                setCropArea(null);
+                processFullImage();
+              }}
+              className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600"
+              disabled={!cropArea}
+            >
+              Clear Crop
+            </button>
             <button
               onClick={() => {
                 setUploadedImage(null);

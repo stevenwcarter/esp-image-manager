@@ -38,6 +38,7 @@ jobs:
           path: ./wasm-image-preview/pkg
   build-site:
     runs-on: ubuntu-latest
+    needs: build-wasm
     steps:
       - uses: actions/checkout@v4
       - name: Use Node.js 20.x

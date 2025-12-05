@@ -452,7 +452,7 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
             <canvas
               ref={imageCanvasRef}
               width={300}
-              height={150}
+              height={200}
               className="cursor-crosshair bg-gray-800"
               onMouseDown={handleCanvasMouseDown}
               onMouseMove={handleCanvasMouseMove}

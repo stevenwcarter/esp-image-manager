@@ -44,6 +44,7 @@ export default defineConfig(() => {
       exclude: ['wasm-image-preview'],
     },
     server: {
+      allowedHosts: ['localhost', 'scadrial'],
       fs: {
         // Allow serving files from one level up to the project root
         allow: ['..'],

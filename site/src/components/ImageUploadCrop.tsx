@@ -41,18 +41,12 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
     if (!uploadedImage || !isWasmLoaded) return;
 
     try {
-      // Create a temporary canvas with the original image dimensions
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = uploadedImage.width;
-      tempCanvas.height = uploadedImage.height;
-      const tempCtx = tempCanvas.getContext('2d');
-      if (!tempCtx) return;
-
-      // Draw the full uploaded image at original size (no scaling/squashing)
-      tempCtx.drawImage(uploadedImage, 0, 0);
+      if (!imageCanvasRef.current) {
+        return;
+      }
 
       // Convert canvas to PNG blob, then to array buffer for WASM
-      tempCanvas.toBlob(async (blob) => {
+      imageCanvasRef.current.toBlob(async (blob) => {
         if (!blob) return;
 
         const arrayBuffer = await blob.arrayBuffer();
@@ -157,7 +151,7 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
   // Throttled preview update function
   const throttledProcessCrop = useCallback(() => {
     const now = Date.now();
-    if (now - lastUpdateTime.current >= 100) {
+    if (now - lastUpdateTime.current >= 200) {
       lastUpdateTime.current = now;
       const currentCropArea = cropAreaRef.current;
       if (currentCropArea && currentCropArea.width !== 0 && currentCropArea.height !== 0) {

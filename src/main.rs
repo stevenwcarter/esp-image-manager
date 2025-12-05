@@ -1,12 +1,10 @@
 #![allow(non_snake_case)]
 
-use std::sync::Arc;
-
 use anyhow::Result;
-use axum_react_starter::{context::GraphQLContext, routes::app};
+use image_manager::{context::GraphQLContext, routes::app};
 
-use axum_react_starter::db::get_pool;
-use axum_react_starter::get_env_typed;
+use image_manager::db::get_pool;
+use image_manager::get_env_typed;
 use log::*;
 
 use log::error;
@@ -25,14 +23,14 @@ async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let context = Arc::new(GraphQLContext { pool: get_pool() });
+    let context = GraphQLContext { pool: get_pool() };
 
     let mut conn = context
         .pool
         .clone()
         .get()
         .expect("Could not get connections for migrations");
-    let migration_result = axum_react_starter::db::run_migrations(&mut conn);
+    let migration_result = image_manager::db::run_migrations(&mut conn);
     match migration_result {
         Ok(_) => info!("Migrations completed"),
         Err(e) => error!("Could not run migrations {:?}", e),

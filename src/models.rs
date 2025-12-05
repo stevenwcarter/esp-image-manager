@@ -3,29 +3,34 @@
 #![allow(unused)]
 #![allow(clippy::all)]
 
+use crate::svc::packed_to_png;
+use anyhow::Result;
 use bigdecimal::{FromPrimitive, ToPrimitive};
 use chrono::NaiveDateTime;
 use juniper::{GraphQLInputObject, GraphQLObject};
 use uuid::Uuid;
 
-use crate::{context::GraphQLContext, schema::*, svc::UploadSvc};
+use crate::{context::GraphQLContext, schema::*, svc::UploadSvc, uuid::UUID};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 
 #[derive(Queryable, Debug, Identifiable, Insertable, Selectable, AsChangeset)]
-#[diesel(primary_key(id), table_name = uploads)]
+#[diesel(primary_key(uuid), table_name = uploads)]
 pub struct Upload {
-    pub id: i32,
+    pub uuid: UUID,
     pub message: Option<String>,
     pub data: Vec<u8>,
+    pub public: bool,
     pub uploaded_at: Option<NaiveDateTime>,
     pub name: Option<String>,
 }
 
 #[juniper::graphql_object(context = GraphQLContext)]
 impl Upload {
-    pub fn id(&self) -> i32 {
-        self.id
+    pub fn uuid(&self) -> Result<String> {
+        let uuid = Uuid::from_slice(self.uuid.0.as_bytes())
+            .map_err(|e| anyhow::anyhow!("Invalid UUID: {}", e))?;
+        Ok(uuid.to_string())
     }
     pub fn message(&self) -> Option<&str> {
         self.message.as_deref()
@@ -39,21 +44,32 @@ impl Upload {
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
     }
+
+    pub fn public(&self) -> bool {
+        self.public
+    }
+
+    pub async fn png(&self) -> String {
+        let png_data = packed_to_png(self).await.expect("Could not convert to png");
+        format!("data:image/png;base64,{}", base64::encode(&png_data))
+    }
 }
 
 #[derive(GraphQLInputObject, Debug, Clone)]
 pub struct UploadInput {
-    pub id: i32,
     pub message: Option<String>,
     pub data: String,
     pub name: Option<String>,
+    pub public: bool,
 }
+
 impl From<UploadInput> for Upload {
     fn from(input: UploadInput) -> Self {
         Self {
-            id: input.id,
+            uuid: UUID::random(),
             message: input.message,
             data: base64::decode(input.data).unwrap_or_default(),
+            public: input.public,
             uploaded_at: Some(chrono::Utc::now().naive_utc()),
             name: input.name,
         }

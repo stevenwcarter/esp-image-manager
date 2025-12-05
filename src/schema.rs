@@ -1,10 +1,11 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    uploads (id) {
-        id -> Integer,
+    uploads (uuid) {
+        uuid -> Binary,
         message -> Nullable<Text>,
         data -> Binary,
+        public -> Bool,
         uploaded_at -> Nullable<Timestamp>,
         name -> Nullable<Text>,
     }

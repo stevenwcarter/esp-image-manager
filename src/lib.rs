@@ -14,6 +14,7 @@ pub mod models;
 pub mod routes;
 pub mod schema;
 pub mod svc;
+pub mod uuid;
 
 // pub(crate) fn format_millis(millis: i64) -> String {
 //     let secs = millis / 1000;
@@ -34,7 +35,7 @@ pub mod svc;
 /// Return an environment variable typed generically
 ///
 /// ```
-/// use axum_react_starter::get_env;
+/// use image_manager::get_env;
 /// assert!(get_env("PATH", "test").len() > 4);
 /// ````
 pub fn get_env(search_key: &str, default: &str) -> String {
@@ -48,7 +49,7 @@ pub fn get_env(search_key: &str, default: &str) -> String {
 /// Return an environment variable typed generically
 ///
 /// ```
-/// use axum_react_starter::get_env_typed;
+/// use image_manager::get_env_typed;
 /// assert!(get_env_typed::<u16>("SHLVL", 9) > 0);
 /// ````
 pub fn get_env_typed<T>(search_key: &str, default: T) -> T

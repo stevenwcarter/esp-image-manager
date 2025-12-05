@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import Button from 'components/Button';
+import { useLocalStorage } from '@uidotdev/usehooks';
 
 interface SubmitModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (message: string, isPublic: boolean) => void;
+  onSubmit: (name: string, message: string, isPublic: boolean) => void;
   getPreviewImageData?: () => ImageData | null;
 }
 
 const SubmitModal = ({ isOpen, onClose, onSubmit, getPreviewImageData }: SubmitModalProps) => {
   const [message, setMessage] = useState('');
+  const [name, setName] = useLocalStorage('upload_name', '');
   const [isPublic, setIsPublic] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -20,7 +22,7 @@ const SubmitModal = ({ isOpen, onClose, onSubmit, getPreviewImageData }: SubmitM
 
     setIsSubmitting(true);
     try {
-      await onSubmit(message.trim(), isPublic);
+      await onSubmit(name.trim(), message.trim(), isPublic);
       // Reset form after successful submission
       setMessage('');
       setIsPublic(false);
@@ -83,6 +85,21 @@ const SubmitModal = ({ isOpen, onClose, onSubmit, getPreviewImageData }: SubmitM
           <div className="text-center mt-2">
             <span className="text-xs text-gray-400">128 × 64 pixels</span>
           </div>
+        </div>
+
+        <div className="mb-4">
+          <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+            Name
+          </label>
+          <input
+            type="text"
+            id="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Your name (optional)"
+            disabled={isSubmitting}
+            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+          />
         </div>
 
         {/* Message Input */}

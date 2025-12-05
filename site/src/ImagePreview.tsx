@@ -24,7 +24,7 @@ const WasmImagePreview = () => {
     setIsModalOpen(true);
   };
 
-  const handleModalSubmit = (message: string, isPublic: boolean) => {
+  const handleModalSubmit = (name: string, message: string, isPublic: boolean) => {
     if (!uploadData) return;
 
     if (!(Uint8Array.prototype as any).toBase64) {
@@ -39,12 +39,13 @@ const WasmImagePreview = () => {
     }
 
     createUpload({
-      message: message,
+      name,
+      message,
       data: (uploadData as any).toBase64(),
       public: isPublic,
     });
   };
-  const handleQuickSubmit = () => {
+  const handleQuickSubmit = (name: string) => {
     if (!uploadData) return;
 
     if (!(Uint8Array.prototype as any).toBase64) {
@@ -59,6 +60,7 @@ const WasmImagePreview = () => {
     }
 
     createUpload({
+      name,
       data: (uploadData as any).toBase64(),
       public: true,
     });

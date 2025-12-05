@@ -77,10 +77,15 @@ const Gallery = ({ uploads }: GalleryProps) => {
                 </div>
               </div>
 
-              <div className="text-xs text-gray-400 space-y-1">
+              <div className="text-sm text-gray-400 space-y-1">
+                {upload.name && (
+                  <div className="text-gray-300 truncate" title={upload.name}>
+                    <span className="text-xs">From:</span> {upload.name}
+                  </div>
+                )}
                 {upload.message && (
                   <div className="text-gray-300 truncate" title={upload.message}>
-                    {upload.message}
+                    <span className="text-xs">Message:</span> {upload.message}
                   </div>
                 )}
                 <div className="text-gray-500 text-[10px] leading-tight">

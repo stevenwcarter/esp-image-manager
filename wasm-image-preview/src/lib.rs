@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use image::{
     DynamicImage, ImageBuffer, ImageReader, Luma,
-    imageops::{self, FilterType::CatmullRom},
+    imageops::{self, FilterType::Triangle},
 };
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
@@ -35,7 +35,7 @@ fn resize_and_pad(mut img: DynamicImage) -> Result<DynamicImage> {
     // 2. Resize to Fit
     // .resize() scales the image down until it fits ENTIRELY within the bounds.
     // It preserves the aspect ratio and does NOT crop.
-    let resized = img.resize(WIDTH, HEIGHT, CatmullRom);
+    let resized = img.resize(WIDTH, HEIGHT, Triangle);
 
     // 3. Create a Black Canvas
     // We create a new Luma8 buffer filled with 0 (Black).

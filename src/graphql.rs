@@ -1,4 +1,5 @@
 use juniper::{EmptySubscription, FieldError, FieldResult, RootNode};
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{
@@ -47,6 +48,9 @@ pub fn create_schema() -> Schema {
 pub fn graphql_translate_anyhow<T>(res: anyhow::Result<T>) -> FieldResult<T> {
     match res {
         Ok(t) => Ok(t),
-        Err(e) => Err(FieldError::from(e)),
+        Err(e) => {
+            error!("Could not upload: {:?}", e);
+            Err(FieldError::from(e))
+        }
     }
 }

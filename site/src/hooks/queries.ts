@@ -7,6 +7,7 @@ export const CREATE_UPLOAD_GQL = gql`
       message
       data
       public
+      name
     }
   }
 `;
@@ -15,6 +16,7 @@ export const LIST_UPLOADS_GQL = gql`
   query ListUploads($limit: Int, $offset: Int) {
     listUploads(limit: $limit, offset: $offset) {
       uuid
+      name
       message
       data
       uploadedAt

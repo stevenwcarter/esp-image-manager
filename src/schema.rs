@@ -6,5 +6,6 @@ diesel::table! {
         message -> Nullable<Text>,
         data -> Binary,
         uploaded_at -> Nullable<Timestamp>,
+        name -> Nullable<Text>,
     }
 }

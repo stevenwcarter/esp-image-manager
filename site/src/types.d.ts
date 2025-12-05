@@ -3,4 +3,5 @@ export type Upload = {
   message?: string;
   data: string;
   uploadedAt?: string;
+  name?: string;
 };

@@ -19,6 +19,7 @@ pub struct Upload {
     pub message: Option<String>,
     pub data: Vec<u8>,
     pub uploaded_at: Option<NaiveDateTime>,
+    pub name: Option<String>,
 }
 
 #[juniper::graphql_object(context = GraphQLContext)]
@@ -35,6 +36,9 @@ impl Upload {
     pub fn uploaded_at(&self) -> Option<NaiveDateTime> {
         self.uploaded_at
     }
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
 }
 
 #[derive(GraphQLInputObject, Debug, Clone)]
@@ -42,6 +46,7 @@ pub struct UploadInput {
     pub id: i32,
     pub message: Option<String>,
     pub data: String,
+    pub name: Option<String>,
 }
 impl From<UploadInput> for Upload {
     fn from(input: UploadInput) -> Self {
@@ -50,6 +55,7 @@ impl From<UploadInput> for Upload {
             message: input.message,
             data: base64::decode(input.data).unwrap_or_default(),
             uploaded_at: Some(chrono::Utc::now().naive_utc()),
+            name: input.name,
         }
     }
 }

@@ -3,6 +3,7 @@ use crate::{
     uuid::UUID,
 };
 use anyhow::{Context, Result};
+use cached::proc_macro::cached;
 use diesel::prelude::*;
 use image::{ImageBuffer, ImageEncoder, Luma};
 use reqwest::Client;
@@ -25,7 +26,7 @@ impl UploadSvc {
         uploads::table
             .filter(uploads::public.eq(true))
             .select(Upload::as_select())
-            .order_by(uploads::uuid.asc())
+            .order_by(uploads::uuid.desc())
             .limit(limit)
             .offset(offset)
             .load::<Upload>(&mut get_conn(context))
@@ -62,12 +63,13 @@ impl UploadSvc {
 
 // convert our bit-packed upload data to a PNG file using the Image crate. Each bit represents a pixel: 0 = white, 1 =
 // black. The dimensions are 128x64 pixels.
-pub async fn packed_to_png(upload: &Upload) -> Result<Vec<u8>> {
+#[cached]
+pub async fn packed_to_png(data: Vec<u8>) -> Vec<u8> {
     let width = 128;
     let height = 64;
     let mut img = ImageBuffer::new(width, height);
 
-    for (i, byte) in upload.data.iter().enumerate() {
+    for (i, byte) in data.iter().enumerate() {
         for bit in 0..8 {
             let pixel_index = i * 8 + bit;
             if pixel_index >= (width * height) as usize {
@@ -94,10 +96,11 @@ pub async fn packed_to_png(upload: &Upload) -> Result<Vec<u8>> {
                 img.height(),
                 image::ExtendedColorType::L8,
             )
-            .context("Could not encode PNG")?;
+            .context("Could not encode PNG")
+            .unwrap_or_default();
     }
 
-    Ok(png_data)
+    png_data
 }
 
 pub async fn push_upload_to_device(upload: &Upload) -> Result<()> {

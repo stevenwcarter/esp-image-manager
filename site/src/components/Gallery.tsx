@@ -13,7 +13,7 @@ const Gallery = ({ uploads }: GalleryProps) => {
   const formatDate = (dateString?: string): string => {
     if (!dateString) return 'Unknown date';
     try {
-      const date = new Date(dateString);
+      const date = new Date(`${dateString}Z`);
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
     } catch {
       return 'Invalid date';
@@ -21,14 +21,7 @@ const Gallery = ({ uploads }: GalleryProps) => {
   };
 
   // Get the 100 most recent uploads
-  const recentUploads = uploads
-    .slice()
-    .sort((a, b) => {
-      const dateA = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
-      const dateB = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
-      return dateB - dateA;
-    })
-    .slice(0, 100);
+  const recentUploads = [...uploads];
 
   return (
     <div className="bg-gray-800 rounded-lg shadow-sm border border-gray-700 p-6 mt-8">

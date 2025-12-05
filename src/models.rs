@@ -14,7 +14,9 @@ use crate::{context::GraphQLContext, schema::*, svc::UploadSvc, uuid::UUID};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
 
-#[derive(Queryable, Debug, Identifiable, Insertable, Selectable, AsChangeset)]
+#[derive(
+    Queryable, Debug, Identifiable, Insertable, Selectable, AsChangeset, PartialEq, Eq, Clone, Hash,
+)]
 #[diesel(primary_key(uuid), table_name = uploads)]
 pub struct Upload {
     pub uuid: UUID,
@@ -50,7 +52,7 @@ impl Upload {
     }
 
     pub async fn png(&self) -> String {
-        let png_data = packed_to_png(self).await.expect("Could not convert to png");
+        let png_data = packed_to_png(self.data.clone()).await;
         format!("data:image/png;base64,{}", base64::encode(&png_data))
     }
 }

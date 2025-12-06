@@ -6,23 +6,17 @@ use image::{
 use std::io::Cursor;
 use wasm_bindgen::prelude::*;
 use web_sys::console;
+use web_time::Instant;
 
 const WIDTH: u32 = 128;
 const HEIGHT: u32 = 64;
 const THRESHOLD: f32 = 128.0;
 
 // Import the `window.alert` function from the Web.
-#[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
-
-// Export a `greet` function from Rust to JavaScript, that alerts a
-// hello message.
-#[wasm_bindgen]
-pub fn greet(name: &str) {
-    alert(&format!("Hello, {}!", name));
-}
+// #[wasm_bindgen]
+// extern "C" {
+//     fn alert(s: &str);
+// }
 
 fn resize_and_pad(mut img: DynamicImage) -> Result<DynamicImage> {
     // 1. Rotation Check
@@ -31,6 +25,8 @@ fn resize_and_pad(mut img: DynamicImage) -> Result<DynamicImage> {
     if img.height() > img.width() {
         img = img.rotate270();
     }
+
+    console::log_1(&format!("Original dimensions: {}x{}", img.width(), img.height()).into());
 
     // 2. Resize to Fit
     // .resize() scales the image down until it fits ENTIRELY within the bounds.
@@ -76,6 +72,7 @@ pub fn preview(image_data: Vec<u8>) -> Vec<u8> {
 }
 
 fn convert_format(image_data: Vec<u8>) -> Result<Vec<u8>> {
+    let start = Instant::now();
     let cursor = Cursor::new(image_data);
     let img = ImageReader::new(cursor).with_guessed_format()?.decode()?;
     let img = resize_and_pad(img).context("could not resize")?;
@@ -132,6 +129,8 @@ fn convert_format(image_data: Vec<u8>) -> Result<Vec<u8>> {
             bit_index = 0;
         }
     }
+
+    console::log_1(&format!("Conversion took: {:?}", start.elapsed()).into());
 
     Ok(packed_buffer)
 }

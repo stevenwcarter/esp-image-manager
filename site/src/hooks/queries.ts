@@ -8,6 +8,7 @@ export const CREATE_UPLOAD_GQL = gql`
       data
       public
       name
+      display
     }
   }
 `;
@@ -21,6 +22,7 @@ export const LIST_UPLOADS_GQL = gql`
       data
       uploadedAt
       png
+      display
     }
   }
 `;

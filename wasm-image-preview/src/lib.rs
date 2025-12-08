@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use image::{
-    DynamicImage, ImageBuffer, ImageReader, Luma,
+    DynamicImage, ImageBuffer, ImageFormat, ImageReader, Luma, Rgb,
     imageops::{self, FilterType::Triangle},
 };
 use std::io::Cursor;
@@ -10,6 +10,8 @@ use web_time::Instant;
 
 const WIDTH: u32 = 128;
 const HEIGHT: u32 = 64;
+const RGB_WIDTH: u32 = 320;
+const RGB_HEIGHT: u32 = 240;
 const THRESHOLD: f32 = 128.0;
 
 // Helper to log errors to the browser console
@@ -122,6 +124,66 @@ pub async fn preview(image_data: Vec<u8>) -> Option<Vec<u8>> {
     // The `async` keyword here mostly serves to wrap the return in a JS Promise.
 
     match convert_format_sync(image_data) {
+        Ok(image) => Some(image),
+        Err(e) => {
+            log_err(&format!("Error generating preview: {:?}", e));
+            None
+        }
+    }
+}
+
+fn resize_and_pad_rgb(mut img: DynamicImage) -> Result<DynamicImage> {
+    let start = Instant::now();
+
+    // 1. Rotation Check
+    if img.height() > img.width() {
+        img = img.rotate270();
+    }
+
+    // 2. Resize to Fit
+    let resized = img.resize(RGB_WIDTH, RGB_HEIGHT, Triangle);
+
+    // 3. Create Black Canvas
+    let mut canvas: ImageBuffer<Rgb<u8>, Vec<u8>> =
+        ImageBuffer::from_pixel(RGB_WIDTH, RGB_HEIGHT, Rgb([0u8, 0u8, 0u8]));
+
+    // 4. Calculate Offsets
+    let x_offset = (RGB_WIDTH - resized.width()) / 2;
+    let y_offset = (RGB_HEIGHT - resized.height()) / 2;
+
+    // 5. Overlay
+    imageops::overlay(
+        &mut canvas,
+        &resized.to_rgb8(),
+        x_offset as i64,
+        y_offset as i64,
+    );
+
+    console::log_1(&format!("Resize and padding took: {:?}", start.elapsed()).into());
+    Ok(DynamicImage::ImageRgb8(canvas))
+}
+
+fn convert_format_sync_rgb(image_data: Vec<u8>) -> Result<Vec<u8>> {
+    let start = Instant::now();
+
+    let cursor = Cursor::new(image_data);
+    let img = ImageReader::new(cursor).with_guessed_format()?.decode()?;
+    let img = resize_and_pad_rgb(img).context("could not resize")?;
+
+    console::log_1(&format!("Total conversion took: {:?}", start.elapsed()).into());
+    let mut buffer = Cursor::new(Vec::new());
+    img.write_to(&mut buffer, ImageFormat::Jpeg).unwrap();
+
+    Ok(buffer.into_inner())
+}
+
+#[wasm_bindgen]
+pub async fn preview_rgb(image_data: Vec<u8>) -> Option<Vec<u8>> {
+    // We don't need spawn_blocking.
+    // Since this is CPU bound and short, we just run it.
+    // The `async` keyword here mostly serves to wrap the return in a JS Promise.
+
+    match convert_format_sync_rgb(image_data) {
         Ok(image) => Some(image),
         Err(e) => {
             log_err(&format!("Error generating preview: {:?}", e));

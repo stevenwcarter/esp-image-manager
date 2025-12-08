@@ -4,9 +4,15 @@ import { ReactSketchCanvas, ReactSketchCanvasRef } from 'react-sketch-canvas';
 interface DrawingCanvasProps {
   isWasmLoaded: boolean;
   onDrawingChange: (dataURL: string) => Promise<void>;
+  displayType?: string;
 }
 
-const DrawingCanvas = ({ isWasmLoaded, onDrawingChange }: DrawingCanvasProps) => {
+const DrawingCanvas = ({
+  isWasmLoaded,
+  onDrawingChange,
+  displayType = 'ESP32',
+}: DrawingCanvasProps) => {
+  console.log(displayType);
   const [inverted, setInverted] = useState(false);
   const [eraseMode, setEraseMode] = useState(false);
   const [strokeWidth, setStrokeWidth] = useState(5);
@@ -43,7 +49,7 @@ const DrawingCanvas = ({ isWasmLoaded, onDrawingChange }: DrawingCanvasProps) =>
       <h2 className="text-xl font-semibold text-white mb-4">Drawing Canvas</h2>
       <p className="text-gray-300 mb-4">
         Draw on the canvas below. Your drawing will be processed in real-time to show how it would
-        appear on the 128x64 OLED display.
+        appear on the selected display.
       </p>
 
       <div className="flex flex-column gap-2 p-2">

@@ -81,6 +81,12 @@ const Gallery = ({ uploads }: GalleryProps) => {
                     <span className="text-xs">Message:</span> {upload.message}
                   </div>
                 )}
+                {upload.display && (
+                  <div className="text-blue-300 truncate" title={upload.display}>
+                    <span className="text-xs">Display:</span>{' '}
+                    {upload.display === 'RGB320x240' ? 'RGB 320x240' : upload.display}
+                  </div>
+                )}
                 <div className="text-gray-500 text-[10px] leading-tight">
                   {formatDate(upload.uploadedAt)}
                 </div>

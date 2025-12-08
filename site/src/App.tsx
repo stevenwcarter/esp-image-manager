@@ -3,6 +3,7 @@ import React, { Suspense } from 'react';
 import { ApolloClient, ApolloProvider, InMemoryCache } from '@apollo/client';
 import { ToastContainer } from 'react-toastify';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { DisplayProvider } from 'contexts/DisplayContext';
 import 'react-toastify/dist/ReactToastify.css';
 
 const PageTemplate = React.lazy(() => import('page/PageTemplate'));
@@ -40,10 +41,12 @@ export const App = () => {
   return (
     <React.StrictMode>
       <ApolloProvider client={apolloClient}>
-        <Suspense fallback={<LoadingSpinner />}>
-          <ToastContainer />
-          <RouterProvider router={router} />
-        </Suspense>
+        <DisplayProvider>
+          <Suspense fallback={<LoadingSpinner />}>
+            <ToastContainer />
+            <RouterProvider router={router} />
+          </Suspense>
+        </DisplayProvider>
       </ApolloProvider>
     </React.StrictMode>
   );

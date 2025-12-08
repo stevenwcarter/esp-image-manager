@@ -1,23 +1,36 @@
 import { useUploads } from 'hooks/useUploads';
 import { useEffect, useState, useRef } from 'react';
+import { useDisplay } from 'contexts/DisplayContext';
 // Import the default initialization function and the specific Rust functions
-import init, { preview } from 'wasm-image-preview';
+import init, { preview, preview_rgb } from 'wasm-image-preview';
 
 // Component imports
 import DrawingCanvas from 'components/DrawingCanvas';
 import ImageUploadCrop from 'components/ImageUploadCrop';
 import DisplayPreview, { DisplayPreviewRef } from 'components/DisplayPreview';
+import RGBImagePreview, { RGBImagePreviewRef } from 'components/RGBImagePreview';
 import SubmitModal from 'components/SubmitModal';
 import Gallery from 'components/Gallery';
 
 const WasmImagePreview = () => {
   const { uploads, createUpload } = useUploads();
+  const { displayType } = useDisplay();
   const [uploadData, setUploadData] = useState<Uint8Array | null>(null);
   const [isWasmLoaded, setIsWasmLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('upload');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const displayPreviewRef = useRef<DisplayPreviewRef>(null);
+  const rgbPreviewRef = useRef<RGBImagePreviewRef>(null);
+
+  // Get the appropriate preview function based on display type
+  const getPreviewFunction = () => {
+    if (displayType === 'RGB320x240') {
+      // Dynamically check for preview_rgb function
+      return preview_rgb;
+    }
+    return preview;
+  };
 
   const handleSubmit = () => {
     if (!isWasmLoaded || !uploadData) return;
@@ -38,11 +51,15 @@ const WasmImagePreview = () => {
       };
     }
 
+    // For RGB320x240 display, uploadData contains JPG data from preview_rgb
+    // For ESP32 display, uploadData contains binary display data from preview
+    // Both are base64 encoded for upload
     createUpload({
       name,
       message,
       data: (uploadData as any).toBase64(),
       public: isPublic,
+      display: displayType,
     });
   };
   const handleQuickSubmit = (name: string) => {
@@ -59,10 +76,14 @@ const WasmImagePreview = () => {
       };
     }
 
+    // For RGB320x240 display, uploadData contains JPG data from preview_rgb
+    // For ESP32 display, uploadData contains binary display data from preview
+    // Both are base64 encoded for upload
     createUpload({
       name,
       data: (uploadData as any).toBase64(),
       public: true,
+      display: displayType,
     });
   };
 
@@ -87,7 +108,8 @@ const WasmImagePreview = () => {
     }
 
     // Process through WASM with actual PNG data
-    const packedResult = await preview(bytes);
+    const previewFn = getPreviewFunction();
+    const packedResult = await previewFn(bytes);
     if (packedResult) {
       handleImageProcessed(packedResult);
     }
@@ -96,7 +118,13 @@ const WasmImagePreview = () => {
   // Handle processed image from both drawing and upload components
   const handleImageProcessed = (packedData: Uint8Array) => {
     setUploadData(packedData);
-    displayPreviewRef.current?.drawPackedImage(packedData);
+    if (displayType === 'ESP32') {
+      // ESP32 display uses packed bits format
+      displayPreviewRef.current?.drawPackedImage(packedData);
+    } else {
+      // RGB320x240 returns JPG data directly
+      rgbPreviewRef.current?.showJPGImage(packedData);
+    }
   };
 
   // 1. Initialize Wasm module on mount
@@ -112,7 +140,9 @@ const WasmImagePreview = () => {
   return (
     <div className="min-h-screen bg-gray-900 p-6">
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold text-white mb-8">ESP32 Display Preview</h1>
+        <h1 className="text-3xl font-bold text-white mb-8">
+          {displayType === 'RGB320x240' ? 'RGB 320x240' : 'ESP32'} Display Preview
+        </h1>
 
         {!isWasmLoaded && (
           <div className="bg-blue-900 border border-blue-700 rounded-md p-4 mb-6">
@@ -156,28 +186,40 @@ const WasmImagePreview = () => {
           {/* Main Content Area */}
           <div className="lg:col-span-2">
             {activeTab === 'draw' && (
-              <DrawingCanvas isWasmLoaded={isWasmLoaded} onDrawingChange={handleDrawingChange} />
+              <DrawingCanvas
+                isWasmLoaded={isWasmLoaded}
+                onDrawingChange={handleDrawingChange}
+                displayType={displayType}
+              />
             )}
 
             {activeTab === 'upload' && (
               <ImageUploadCrop
                 onImageProcessed={handleImageProcessed}
                 isWasmLoaded={isWasmLoaded}
-                preview={async (image) => {
-                  return await preview(image);
-                }}
+                preview={getPreviewFunction()}
+                displayType={displayType}
               />
             )}
           </div>
 
           {/* Preview Panel */}
           <div className="lg:col-span-1">
-            <DisplayPreview
-              ref={displayPreviewRef}
-              isWasmLoaded={isWasmLoaded}
-              onSubmit={handleSubmit}
-              onQuickSubmit={handleQuickSubmit}
-            />
+            {displayType !== 'RGB320x240' ? (
+              <DisplayPreview
+                ref={displayPreviewRef}
+                isWasmLoaded={isWasmLoaded}
+                onSubmit={handleSubmit}
+                onQuickSubmit={handleQuickSubmit}
+              />
+            ) : (
+              <RGBImagePreview
+                ref={rgbPreviewRef}
+                isWasmLoaded={isWasmLoaded}
+                onSubmit={handleSubmit}
+                onQuickSubmit={handleQuickSubmit}
+              />
+            )}
           </div>
         </div>
 
@@ -189,7 +231,11 @@ const WasmImagePreview = () => {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onSubmit={handleModalSubmit}
-          getPreviewImageData={() => displayPreviewRef.current?.getImageData() || null}
+          getPreviewImageData={() =>
+            displayType === 'ESP32'
+              ? displayPreviewRef.current?.getImageData() || null
+              : rgbPreviewRef.current?.getImageData() || null
+          }
         />
       </div>
     </div>

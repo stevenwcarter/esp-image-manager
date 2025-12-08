@@ -5,6 +5,7 @@ export type Upload = {
   uploadedAt?: string;
   name?: string;
   png?: string;
+  display?: string;
 };
 
 export type UploadInput = {
@@ -12,4 +13,5 @@ export type UploadInput = {
   data: string;
   public: boolean;
   name?: string;
+  display?: string;
 };

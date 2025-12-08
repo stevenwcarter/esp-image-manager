@@ -12,9 +12,15 @@ interface ImageUploadCropProps {
   onImageProcessed: (packedData: Uint8Array) => void;
   isWasmLoaded: boolean;
   preview: (bytes: Uint8Array) => Promise<Uint8Array | undefined>;
+  displayType?: string;
 }
 
-const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploadCropProps) => {
+const ImageUploadCrop = ({
+  onImageProcessed,
+  isWasmLoaded,
+  preview,
+  displayType = 'ESP32',
+}: ImageUploadCropProps) => {
   const [uploadedImage, setUploadedImage] = useState<HTMLImageElement | null>(null);
   const [cropArea, setCropArea] = useState<CropArea | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -22,7 +28,7 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [aspectRatioLocked, setAspectRatioLocked] = useState(true);
+  const [aspectRatioLocked, setAspectRatioLocked] = useState(displayType === 'ESP32');
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
   const cropAreaRef = useRef<CropArea | null>(null);
 
@@ -32,6 +38,11 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
 
   // Throttle preview updates to at most once per 100ms
   const lastUpdateTime = useRef<number>(0);
+
+  // Get the appropriate image format based on display type
+  const getImageFormat = () => {
+    return displayType === 'RGB320x240' ? 'image/jpeg' : 'image/png';
+  };
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -53,12 +64,12 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         const arrayBuffer = await blob.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
 
-        // Process through WASM with actual PNG data - let WASM handle padding
+        // Process through WASM with actual image data - let WASM handle padding
         const packedResult = await preview(uint8Array);
         if (packedResult) {
           onImageProcessed(packedResult);
         }
-      }, 'image/png');
+      }, getImageFormat());
     } catch (err) {
       console.error('Error processing full image:', err);
       setError('Error processing full image');
@@ -141,12 +152,12 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         const arrayBuffer = await blob.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
 
-        // Process through WASM with actual PNG data - let WASM handle scaling/padding
+        // Process through WASM with actual image data - let WASM handle scaling/padding
         const packedResult = await preview(uint8Array);
         console.log('Cropped image processed, packed size:', packedResult?.length);
         if (!packedResult) return;
         onImageProcessed(packedResult);
-      }, 'image/png');
+      }, getImageFormat());
     } catch (err) {
       console.error('Error processing cropped image:', err);
       setError('Error processing cropped image');

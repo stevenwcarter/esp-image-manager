@@ -105,16 +105,25 @@ pub async fn packed_to_png(data: Vec<u8>) -> Vec<u8> {
 
 pub async fn push_upload_to_device(upload: &Upload) -> Result<()> {
     let client = Client::new();
-    if upload.data.len() > 1025 {
-        anyhow::bail!("Upload data too large to push to device");
-    }
+    if upload.display.as_deref() == Some("RGB320x240") {
+        client
+            .post(get_env_typed("ESP_RGB_ENDPOINT", "".to_owned()))
+            .body(upload.data.clone())
+            .send()
+            .await
+            .context("Could not send to RGB device")?;
+    } else {
+        if upload.data.len() > 1025 {
+            anyhow::bail!("Upload data too large to push to device");
+        }
 
-    client
-        .post(get_env_typed("ESP_ENDPOINT", "".to_owned()))
-        .body(upload.data.clone())
-        .send()
-        .await
-        .context("Could not send to device")?;
+        client
+            .post(get_env_typed("ESP_ENDPOINT", "".to_owned()))
+            .body(upload.data.clone())
+            .send()
+            .await
+            .context("Could not send to device")?;
+    }
 
     Ok(())
 }

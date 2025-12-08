@@ -8,5 +8,6 @@ diesel::table! {
         public -> Bool,
         uploaded_at -> Nullable<Timestamp>,
         name -> Nullable<Text>,
+        display -> Nullable<Text>,
     }
 }

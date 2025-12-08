@@ -25,6 +25,7 @@ pub struct Upload {
     pub public: bool,
     pub uploaded_at: Option<NaiveDateTime>,
     pub name: Option<String>,
+    pub display: Option<String>,
 }
 
 #[juniper::graphql_object(context = GraphQLContext)]
@@ -63,6 +64,7 @@ pub struct UploadInput {
     pub data: String,
     pub name: Option<String>,
     pub public: bool,
+    pub display: String,
 }
 
 impl From<UploadInput> for Upload {
@@ -74,6 +76,7 @@ impl From<UploadInput> for Upload {
             public: input.public,
             uploaded_at: Some(chrono::Utc::now().naive_utc()),
             name: input.name,
+            display: Some(input.display),
         }
     }
 }

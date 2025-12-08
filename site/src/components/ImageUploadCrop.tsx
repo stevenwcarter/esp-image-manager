@@ -11,7 +11,7 @@ interface CropArea {
 interface ImageUploadCropProps {
   onImageProcessed: (packedData: Uint8Array) => void;
   isWasmLoaded: boolean;
-  preview: (bytes: Uint8Array) => Uint8Array;
+  preview: (bytes: Uint8Array) => Promise<Uint8Array | undefined>;
 }
 
 const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploadCropProps) => {
@@ -20,6 +20,7 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
   const [isDrawing, setIsDrawing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isPreviewing, setIsPreviewing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aspectRatioLocked, setAspectRatioLocked] = useState(true);
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -53,8 +54,10 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         const uint8Array = new Uint8Array(arrayBuffer);
 
         // Process through WASM with actual PNG data - let WASM handle padding
-        const packedResult = preview(uint8Array);
-        onImageProcessed(packedResult);
+        const packedResult = await preview(uint8Array);
+        if (packedResult) {
+          onImageProcessed(packedResult);
+        }
       }, 'image/png');
     } catch (err) {
       console.error('Error processing full image:', err);
@@ -139,7 +142,9 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
         const uint8Array = new Uint8Array(arrayBuffer);
 
         // Process through WASM with actual PNG data - let WASM handle scaling/padding
-        const packedResult = preview(uint8Array);
+        const packedResult = await preview(uint8Array);
+        console.log('Cropped image processed, packed size:', packedResult?.length);
+        if (!packedResult) return;
         onImageProcessed(packedResult);
       }, 'image/png');
     } catch (err) {
@@ -149,14 +154,19 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
   }, [uploadedImage, isWasmLoaded, preview, onImageProcessed]);
 
   // Throttled preview update function
-  const throttledProcessCrop = useCallback(() => {
+  const throttledProcessCrop = useCallback(async () => {
     const now = Date.now();
-    if (now - lastUpdateTime.current >= 200) {
+    if (now - lastUpdateTime.current >= 40 && !isPreviewing) {
+      setIsPreviewing(true);
+      console.log('Running now');
       lastUpdateTime.current = now;
       const currentCropArea = cropAreaRef.current;
       if (currentCropArea && currentCropArea.width !== 0 && currentCropArea.height !== 0) {
-        processCroppedImage();
+        await processCroppedImage();
       }
+      setIsPreviewing(false);
+    } else {
+      console.log('Throttled');
     }
   }, [processCroppedImage]);
 
@@ -347,12 +357,13 @@ const ImageUploadCrop = ({ onImageProcessed, isWasmLoaded, preview }: ImageUploa
     setDragOffset({ x: 0, y: 0 });
 
     // Ensure final state is processed with a small delay to avoid conflicts
-    setTimeout(() => {
-      const currentCropArea = cropAreaRef.current;
-      if (currentCropArea && currentCropArea.width !== 0 && currentCropArea.height !== 0) {
-        processCroppedImage();
-      }
-    }, 50);
+    // setTimeout(() => {
+    //   const currentCropArea = cropAreaRef.current;
+    //   if (currentCropArea && currentCropArea.width !== 0 && currentCropArea.height !== 0) {
+    //     console.log('Finalizing crop processing (crop end)');
+    //     processCroppedImage();
+    //   }
+    // }, 50);
   };
 
   // Mouse event handlers (delegate to unified handlers)

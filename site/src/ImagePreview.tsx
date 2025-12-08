@@ -87,8 +87,10 @@ const WasmImagePreview = () => {
     }
 
     // Process through WASM with actual PNG data
-    const packedResult = preview(bytes);
-    handleImageProcessed(packedResult);
+    const packedResult = await preview(bytes);
+    if (packedResult) {
+      handleImageProcessed(packedResult);
+    }
   };
 
   // Handle processed image from both drawing and upload components
@@ -161,7 +163,9 @@ const WasmImagePreview = () => {
               <ImageUploadCrop
                 onImageProcessed={handleImageProcessed}
                 isWasmLoaded={isWasmLoaded}
-                preview={preview}
+                preview={async (image) => {
+                  return await preview(image);
+                }}
               />
             )}
           </div>

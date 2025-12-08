@@ -5,7 +5,7 @@ use crate::{
 use anyhow::{Context, Result};
 use cached::proc_macro::cached;
 use diesel::prelude::*;
-use image::{ImageBuffer, ImageEncoder, Luma};
+use image::{ImageBuffer, ImageEncoder, ImageReader, Luma};
 use reqwest::Client;
 use uuid::Uuid;
 
@@ -106,9 +106,16 @@ pub async fn packed_to_png(data: Vec<u8>) -> Vec<u8> {
 pub async fn push_upload_to_device(upload: &Upload) -> Result<()> {
     let client = Client::new();
     if upload.display.as_deref() == Some("RGB320x240") {
+        let data = ImageReader::new(std::io::Cursor::new(upload.data.clone()));
+        let img = data
+            .with_guessed_format()
+            .context("Could not guess image format")?
+            .decode()
+            .context("Could not decode image")?;
+
         client
             .post(get_env_typed("ESP_RGB_ENDPOINT", "".to_owned()))
-            .body(upload.data.clone())
+            .body(img.to_rgb8().into_raw())
             .send()
             .await
             .context("Could not send to RGB device")?;

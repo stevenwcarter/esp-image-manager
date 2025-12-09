@@ -1,5 +1,9 @@
 use crate::{
-    context::GraphQLContext, db::get_conn, get_env_typed, models::Upload, schema::uploads,
+    context::GraphQLContext,
+    db::get_conn,
+    get_env_typed,
+    models::{DisplayFormat, Upload},
+    schema::uploads,
     uuid::UUID,
 };
 use anyhow::{Context, Result};
@@ -105,7 +109,7 @@ pub async fn packed_to_png(data: Vec<u8>) -> Vec<u8> {
 
 pub async fn push_upload_to_device(upload: &Upload) -> Result<()> {
     let client = Client::new();
-    if upload.display.as_deref() == Some("RGB320x240") {
+    if upload.display.as_deref() == Some(DisplayFormat::RGB320x240.as_str()) {
         let data = ImageReader::new(std::io::Cursor::new(upload.data.clone()));
         let img = data
             .with_guessed_format()

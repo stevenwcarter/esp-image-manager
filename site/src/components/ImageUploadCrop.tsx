@@ -32,17 +32,16 @@ const ImageUploadCrop = ({
   const imageCanvasRef = useRef<HTMLCanvasElement>(null);
   const cropAreaRef = useRef<CropArea | null>(null);
 
-  // Constants
-  // const DISPLAY_WIDTH = 128;
-  // const DISPLAY_HEIGHT = 64;
-
   // Throttle preview updates to at most once per 100ms
   const lastUpdateTime = useRef<number>(0);
 
   // Get the appropriate image format based on display type
   const getImageFormat = () => {
-    return displayType === 'RGB320x240' ? 'image/jpeg' : 'image/png';
+    return displayType === 'RGB_320x240' ? 'image/jpeg' : 'image/png';
   };
+
+  const getMaxHeight = () => (displayType === 'RGB_320x240' ? 240 : 64);
+  const getMaxWidth = () => (displayType === 'RGB_320x240' ? 320 : 128);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -122,8 +121,26 @@ const ImageUploadCrop = ({
       // Clamp coordinates to image boundaries
       const clampedX = Math.max(0, Math.min(imgCropX, uploadedImage.width));
       const clampedY = Math.max(0, Math.min(imgCropY, uploadedImage.height));
-      const clampedWidth = Math.max(1, Math.min(imgCropWidth, uploadedImage.width - clampedX));
-      const clampedHeight = Math.max(1, Math.min(imgCropHeight, uploadedImage.height - clampedY));
+      let clampedWidth = Math.max(1, Math.min(imgCropWidth, uploadedImage.width - clampedX));
+      let clampedHeight = Math.max(1, Math.min(imgCropHeight, uploadedImage.height - clampedY));
+
+      const sourceClampedWidth = clampedWidth;
+      const sourceClampedHeight = clampedHeight;
+
+      if (clampedWidth > clampedHeight) {
+        clampedHeight = Math.floor((clampedHeight * getMaxWidth()) / clampedWidth);
+        clampedWidth = getMaxWidth();
+      } else {
+        clampedWidth = Math.floor((clampedWidth * getMaxHeight()) / clampedHeight);
+        clampedHeight = getMaxHeight();
+      }
+      // if (width > height) {
+      //   height = Math.floor((height * 320) / width);
+      //   width = 320;
+      // } else {
+      //   width = Math.floor((width * 240) / height);
+      //   height = 240;
+      // }
 
       // Create a canvas with the cropped portion at original resolution
       const tempCanvas = document.createElement('canvas');
@@ -137,8 +154,8 @@ const ImageUploadCrop = ({
         uploadedImage,
         clampedX,
         clampedY,
-        clampedWidth,
-        clampedHeight, // source crop from original image
+        sourceClampedWidth,
+        sourceClampedHeight, // source crop from original image
         0,
         0,
         clampedWidth,

@@ -37,7 +37,7 @@ const Gallery = ({ uploads }: GalleryProps) => {
           <p className="text-gray-400">No uploads found</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4 4xl:grid-cols-5 5xl:grid-cols-6 gap-6">
           {recentUploads.map((upload) => (
             <div
               key={upload.uuid}
@@ -45,17 +45,25 @@ const Gallery = ({ uploads }: GalleryProps) => {
             >
               <div className="flex justify-center mb-3">
                 <div className="bg-black p-3 rounded">
-                  {upload.png ? (
-                    <img
-                      src={upload.png}
-                      alt={`Upload ${upload.uuid}`}
-                      className="border border-gray-600 bg-black"
-                      style={{
-                        imageRendering: 'pixelated',
-                        width: `${THUMBNAIL_WIDTH}px`,
-                        height: `${THUMBNAIL_HEIGHT}px`,
-                      }}
-                    />
+                  {upload.imgSrc ? (
+                    upload.display === 'ESP32_128x64' ? (
+                      <img
+                        src={upload.imgSrc}
+                        alt={`Upload ${upload.uuid}`}
+                        className="border border-gray-600 bg-black"
+                        style={{
+                          imageRendering: 'pixelated',
+                          width: `${THUMBNAIL_WIDTH}px`,
+                          height: `${THUMBNAIL_HEIGHT}px`,
+                        }}
+                      />
+                    ) : (
+                      <img
+                        src={upload.imgSrc}
+                        alt={`Upload ${upload.uuid}`}
+                        className="border border-gray-600 bg-black max-h-[240px] max-w-[320px]"
+                      />
+                    )
                   ) : (
                     <div
                       className="border border-gray-600 bg-gray-700 flex items-center justify-center text-gray-400 text-xs"

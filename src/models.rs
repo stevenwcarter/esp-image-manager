@@ -3,16 +3,55 @@
 #![allow(unused)]
 #![allow(clippy::all)]
 
+use std::str::FromStr;
+
 use crate::svc::packed_to_png;
 use anyhow::Result;
 use bigdecimal::{FromPrimitive, ToPrimitive};
 use chrono::NaiveDateTime;
-use juniper::{GraphQLInputObject, GraphQLObject};
+use juniper::{GraphQLEnum, GraphQLInputObject, GraphQLObject};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{context::GraphQLContext, schema::*, svc::UploadSvc, uuid::UUID};
 use bigdecimal::BigDecimal;
 use diesel::prelude::*;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, GraphQLEnum)]
+pub enum DisplayFormat {
+    #[serde(rename = "RGB_320x240")]
+    #[graphql(name = "RGB_320x240")]
+    RGB320x240,
+    #[serde(rename = "Esp32")]
+    #[graphql(name = "Esp32")]
+    Esp32,
+}
+impl DisplayFormat {
+    pub(crate) fn as_str(&self) -> &str {
+        match self {
+            DisplayFormat::RGB320x240 => "RGB_320x240",
+            DisplayFormat::Esp32 => "Esp32",
+        }
+    }
+}
+
+impl FromStr for DisplayFormat {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "RGB_320x240" => Ok(DisplayFormat::RGB320x240),
+            "Esp32" => Ok(DisplayFormat::Esp32),
+            _ => Err(anyhow::anyhow!("Invalid display format: {}", s)),
+        }
+    }
+}
+
+impl ToString for DisplayFormat {
+    fn to_string(&self) -> String {
+        self.as_str().to_owned()
+    }
+}
 
 #[derive(
     Queryable, Debug, Identifiable, Insertable, Selectable, AsChangeset, PartialEq, Eq, Clone, Hash,
@@ -52,7 +91,14 @@ impl Upload {
         self.public
     }
 
-    pub async fn png(&self) -> String {
+    pub fn display(&self) -> Option<&str> {
+        self.display.as_deref()
+    }
+
+    pub async fn img_src(&self) -> String {
+        if self.display.as_deref() == Some(DisplayFormat::RGB320x240.as_str()) {
+            return format!("data:image/jpeg;base64,{}", base64::encode(&self.data));
+        }
         let png_data = packed_to_png(self.data.clone()).await;
         format!("data:image/png;base64,{}", base64::encode(&png_data))
     }
@@ -64,7 +110,7 @@ pub struct UploadInput {
     pub data: String,
     pub name: Option<String>,
     pub public: bool,
-    pub display: String,
+    pub display: DisplayFormat,
 }
 
 impl From<UploadInput> for Upload {
@@ -76,7 +122,7 @@ impl From<UploadInput> for Upload {
             public: input.public,
             uploaded_at: Some(chrono::Utc::now().naive_utc()),
             name: input.name,
-            display: Some(input.display),
+            display: Some(input.display.to_string()),
         }
     }
 }

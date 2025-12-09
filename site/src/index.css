@@ -25,3 +25,7 @@
 #root {
   height: 100vh;
 }
+
+img:not([src]), img[src=""] {
+  visibility: hidden;
+}

@@ -16,6 +16,7 @@ const DrawingCanvas = ({
   const [inverted, setInverted] = useState(false);
   const [eraseMode, setEraseMode] = useState(false);
   const [strokeWidth, setStrokeWidth] = useState(5);
+  const [drawingColor, setDrawingColor] = useState('#FFFFFF');
   const [eraserWidth, setEraserWidth] = useState(10);
   const canvasDrawRef = useRef<ReactSketchCanvasRef>(null);
 
@@ -42,6 +43,10 @@ const DrawingCanvas = ({
 
     const dataURL = await canvasDrawRef.current.exportImage('jpeg');
     await onDrawingChange(dataURL);
+  };
+
+  const handleColorChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setDrawingColor(event.target.value);
   };
 
   return (
@@ -100,19 +105,20 @@ const DrawingCanvas = ({
         </div>
       </div>
 
-      <div className="border-2 border-gray-600 rounded-lg p-4 bg-gray-900">
+      <div className="border-2 border-gray-600 rounded-lg p-4 bg-gray-900 flex flex-col md:flex-row">
         <ReactSketchCanvas
           ref={canvasDrawRef}
           strokeWidth={strokeWidth}
           eraserWidth={eraserWidth}
           width={'512px'}
           height={'256px'}
-          strokeColor={inverted ? '#000000' : '#FFFFFF'}
+          strokeColor={drawingColor ? drawingColor : inverted ? '#000000' : '#FFFFFF'}
           canvasColor={inverted ? '#FFFFFF' : '#000000'}
           onChange={handleDrawingChange}
           className="border border-gray-600 bg-black"
           style={{ touchAction: 'none' }}
         />
+        <input type="color" onChange={handleColorChange} />
       </div>
 
       <div className="mt-4 flex gap-2">

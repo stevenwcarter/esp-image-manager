@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 
-export type DisplayType = 'ESP32' | 'RGB320x240';
+export type DisplayType = 'Esp32' | 'RGB_320x240';
 
 interface DisplayContextType {
   displayType: DisplayType;
@@ -14,7 +14,7 @@ interface DisplayProviderProps {
 }
 
 export const DisplayProvider: React.FC<DisplayProviderProps> = ({ children }) => {
-  const [displayType, setDisplayType] = useState<DisplayType>('RGB320x240'); // Default to RGB320x240
+  const [displayType, setDisplayType] = useState<DisplayType>('RGB_320x240'); // Default to RGB320x240
 
   return (
     <DisplayContext.Provider value={{ displayType, setDisplayType }}>

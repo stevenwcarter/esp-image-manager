@@ -4,7 +4,7 @@ export type Upload = {
   data: string;
   uploadedAt?: string;
   name?: string;
-  png?: string;
+  imgSrc?: string;
   display?: string;
 };
 

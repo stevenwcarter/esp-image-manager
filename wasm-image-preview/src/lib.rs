@@ -15,8 +15,8 @@ const RGB_HEIGHT: u32 = 240;
 const THRESHOLD: f32 = 128.0;
 
 // Helper to log errors to the browser console
-fn log_err(msg: &str) {
-    console::log_1(&msg.into());
+fn log_err<T: AsRef<str>>(msg: T) {
+    console::log_1(&msg.as_ref().into());
 }
 
 fn resize_and_pad(mut img: DynamicImage) -> Result<DynamicImage> {
@@ -133,6 +133,7 @@ pub async fn preview(image_data: Vec<u8>) -> Option<Vec<u8>> {
 }
 
 fn resize_and_pad_rgb(mut img: DynamicImage) -> Result<DynamicImage> {
+    log_err(format!("Width: {}, Height: {}", img.width(), img.height()));
     let start = Instant::now();
 
     // 1. Rotation Check

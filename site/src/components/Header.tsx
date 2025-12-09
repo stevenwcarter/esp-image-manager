@@ -15,9 +15,9 @@ const Header: React.FC = () => {
 
         <nav className="flex space-x-4">
           <button
-            onClick={() => handleDisplayChange('ESP32')}
+            onClick={() => handleDisplayChange('Esp32')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              displayType === 'ESP32'
+              displayType === 'Esp32'
                 ? 'bg-blue-600 text-white'
                 : 'text-gray-300 hover:bg-gray-700 hover:text-white'
             }`}
@@ -25,9 +25,9 @@ const Header: React.FC = () => {
             ESP32 Display
           </button>
           <button
-            onClick={() => handleDisplayChange('RGB320x240')}
+            onClick={() => handleDisplayChange('RGB_320x240')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              displayType === 'RGB320x240'
+              displayType === 'RGB_320x240'
                 ? 'bg-blue-600 text-white'
                 : 'text-gray-300 hover:bg-gray-700 hover:text-white'
             }`}

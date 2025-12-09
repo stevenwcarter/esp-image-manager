@@ -36,9 +36,20 @@ const RGBImagePreview = forwardRef<RGBImagePreviewRef, RGBImagePreviewProps>(
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
 
+      let width = imageRef.current.naturalWidth;
+      let height = imageRef.current.naturalHeight;
+
+      if (width > height) {
+        height = Math.floor((height * 320) / width);
+        width = 320;
+      } else {
+        width = Math.floor((width * 240) / height);
+        height = 240;
+      }
+
       // Draw the image to canvas to get ImageData
-      canvas.width = imageRef.current.naturalWidth || 320;
-      canvas.height = imageRef.current.naturalHeight || 240;
+      canvas.width = width;
+      canvas.height = height;
       ctx.drawImage(imageRef.current, 0, 0);
 
       return ctx.getImageData(0, 0, canvas.width, canvas.height);

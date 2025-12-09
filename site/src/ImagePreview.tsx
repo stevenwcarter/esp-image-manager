@@ -25,7 +25,7 @@ const WasmImagePreview = () => {
 
   // Get the appropriate preview function based on display type
   const getPreviewFunction = () => {
-    if (displayType === 'RGB320x240') {
+    if (displayType === 'RGB_320x240') {
       // Dynamically check for preview_rgb function
       return preview_rgb;
     }
@@ -118,7 +118,7 @@ const WasmImagePreview = () => {
   // Handle processed image from both drawing and upload components
   const handleImageProcessed = (packedData: Uint8Array) => {
     setUploadData(packedData);
-    if (displayType === 'ESP32') {
+    if (displayType === 'Esp32') {
       // ESP32 display uses packed bits format
       displayPreviewRef.current?.drawPackedImage(packedData);
     } else {
@@ -141,7 +141,7 @@ const WasmImagePreview = () => {
     <div className="min-h-screen bg-gray-900 p-6">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold text-white mb-8">
-          {displayType === 'RGB320x240' ? 'RGB 320x240' : 'ESP32'} Display Preview
+          {displayType === 'RGB_320x240' ? 'RGB 320x240' : 'ESP32'} Display Preview
         </h1>
 
         {!isWasmLoaded && (
@@ -205,7 +205,7 @@ const WasmImagePreview = () => {
 
           {/* Preview Panel */}
           <div className="lg:col-span-1">
-            {displayType !== 'RGB320x240' ? (
+            {displayType !== 'RGB_320x240' ? (
               <DisplayPreview
                 ref={displayPreviewRef}
                 isWasmLoaded={isWasmLoaded}
@@ -232,7 +232,7 @@ const WasmImagePreview = () => {
           onClose={() => setIsModalOpen(false)}
           onSubmit={handleModalSubmit}
           getPreviewImageData={() =>
-            displayType === 'ESP32'
+            displayType === 'Esp32'
               ? displayPreviewRef.current?.getImageData() || null
               : rgbPreviewRef.current?.getImageData() || null
           }

@@ -44,6 +44,13 @@ impl UploadSvc {
 
         push_upload_to_device(upload).await?;
 
+        // Notify screensaver of new upload
+        if let Some(screensaver) = &context.screensaver {
+            if let Err(e) = screensaver.on_new_upload(upload).await {
+                tracing::warn!("Failed to notify screensaver of new upload: {}", e);
+            }
+        }
+
         Self::get(context, upload.uuid.into())
     }
     pub fn update(context: &GraphQLContext, upload: &Upload) -> Result<Upload> {

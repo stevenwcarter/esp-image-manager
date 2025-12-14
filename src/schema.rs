@@ -1,6 +1,13 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
+    config (key) {
+        key -> Nullable<Text>,
+        value -> Text,
+    }
+}
+
+diesel::table! {
     uploads (uuid) {
         uuid -> Binary,
         message -> Nullable<Text>,
@@ -11,3 +18,5 @@ diesel::table! {
         display -> Nullable<Text>,
     }
 }
+
+diesel::allow_tables_to_appear_in_same_query!(config, uploads,);

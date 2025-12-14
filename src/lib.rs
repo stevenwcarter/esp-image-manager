@@ -7,6 +7,7 @@
 use std::{env, fmt, str::FromStr};
 
 pub mod api;
+pub mod config;
 pub mod context;
 pub mod db;
 pub mod graphql;

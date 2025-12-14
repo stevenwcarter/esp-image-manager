@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 
 use anyhow::Result;
-use image_manager::{context::GraphQLContext, routes::app};
+use image_manager::{context::GraphQLContext, routes::app, svc::ScreensaverSvc};
+use std::sync::Arc;
 
 use image_manager::db::get_pool;
 use image_manager::get_env_typed;
@@ -23,9 +24,13 @@ async fn main() -> Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let context = GraphQLContext { pool: get_pool() };
+    // Create initial context without screensaver for migrations
+    let base_context = GraphQLContext { 
+        pool: get_pool(),
+        screensaver: None,
+    };
 
-    let mut conn = context
+    let mut conn = base_context
         .pool
         .clone()
         .get()
@@ -35,6 +40,18 @@ async fn main() -> Result<()> {
         Ok(_) => info!("Migrations completed"),
         Err(e) => error!("Could not run migrations {:?}", e),
     };
+
+    // Create screensaver service and final context
+    let screensaver_svc = Arc::new(ScreensaverSvc::new(Arc::new(base_context.clone())));
+    let context = GraphQLContext {
+        pool: base_context.pool,
+        screensaver: Some(screensaver_svc.clone()),
+    };
+
+    // Start screensaver service
+    if let Err(e) = screensaver_svc.start().await {
+        error!("Failed to start screensaver service: {}", e);
+    }
 
     let app = app(context.clone());
 

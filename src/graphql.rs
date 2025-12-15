@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::{
     context::GraphQLContext,
     models::{Upload, UploadInput},
-    svc::{ScreensaverState, UploadSvc},
+    svc::UploadSvc,
 };
 
 #[derive(GraphQLObject)]
@@ -45,7 +45,10 @@ impl Query {
                 interval_seconds: state.interval_seconds as i32,
             })
         } else {
-            Err(FieldError::new("Screensaver service not available", juniper::Value::Null))
+            Err(FieldError::new(
+                "Screensaver service not available",
+                juniper::Value::Null,
+            ))
         }
     }
 }
@@ -68,7 +71,10 @@ impl Mutation {
             graphql_translate_anyhow(screensaver.pause().await)?;
             Ok(true)
         } else {
-            Err(FieldError::new("Screensaver service not available", juniper::Value::Null))
+            Err(FieldError::new(
+                "Screensaver service not available",
+                juniper::Value::Null,
+            ))
         }
     }
 
@@ -77,7 +83,10 @@ impl Mutation {
             graphql_translate_anyhow(screensaver.resume().await)?;
             Ok(true)
         } else {
-            Err(FieldError::new("Screensaver service not available", juniper::Value::Null))
+            Err(FieldError::new(
+                "Screensaver service not available",
+                juniper::Value::Null,
+            ))
         }
     }
 
@@ -86,7 +95,10 @@ impl Mutation {
             graphql_translate_anyhow(screensaver.advance_to_next_image().await)?;
             Ok(true)
         } else {
-            Err(FieldError::new("Screensaver service not available", juniper::Value::Null))
+            Err(FieldError::new(
+                "Screensaver service not available",
+                juniper::Value::Null,
+            ))
         }
     }
 
@@ -95,19 +107,31 @@ impl Mutation {
             graphql_translate_anyhow(screensaver.go_to_previous_image().await)?;
             Ok(true)
         } else {
-            Err(FieldError::new("Screensaver service not available", juniper::Value::Null))
+            Err(FieldError::new(
+                "Screensaver service not available",
+                juniper::Value::Null,
+            ))
         }
     }
 
-    pub async fn set_screensaver_interval(context: &GraphQLContext, seconds: i32) -> FieldResult<bool> {
+    pub async fn set_screensaver_interval(
+        context: &GraphQLContext,
+        seconds: i32,
+    ) -> FieldResult<bool> {
         if let Some(screensaver) = &context.screensaver {
             if seconds <= 0 {
-                return Err(FieldError::new("Interval must be positive", juniper::Value::Null));
+                return Err(FieldError::new(
+                    "Interval must be positive",
+                    juniper::Value::Null,
+                ));
             }
             graphql_translate_anyhow(screensaver.set_interval(seconds as u64).await)?;
             Ok(true)
         } else {
-            Err(FieldError::new("Screensaver service not available", juniper::Value::Null))
+            Err(FieldError::new(
+                "Screensaver service not available",
+                juniper::Value::Null,
+            ))
         }
     }
 }

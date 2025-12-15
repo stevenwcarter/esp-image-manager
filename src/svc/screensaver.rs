@@ -15,7 +15,7 @@ use std::{
     },
     time::Duration,
 };
-use tokio::{sync::RwLock, time::interval};
+use tokio::{sync::{mpsc, RwLock}, time::sleep};
 use tracing::{error, info, warn};
 
 #[derive(Debug, Clone)]
@@ -31,6 +31,7 @@ pub struct ScreensaverSvc {
     is_running: Arc<AtomicBool>,
     current_index: Arc<AtomicUsize>,
     context: Arc<GraphQLContext>,
+    reset_timer_tx: Arc<RwLock<Option<mpsc::UnboundedSender<()>>>>,
 }
 
 impl ScreensaverSvc {
@@ -45,6 +46,7 @@ impl ScreensaverSvc {
             is_running: Arc::new(AtomicBool::new(true)),
             current_index: Arc::new(AtomicUsize::new(0)),
             context,
+            reset_timer_tx: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -84,26 +86,31 @@ impl ScreensaverSvc {
 
     /// Main slideshow loop
     async fn run_slideshow(&self) {
-        let mut interval_timer = interval(Duration::from_secs(
-            self.state.read().await.interval_seconds,
-        ));
+        let (reset_tx, mut reset_rx) = mpsc::unbounded_channel();
+        
+        // Store the sender so other methods can reset the timer
+        {
+            let mut tx_guard = self.reset_timer_tx.write().await;
+            *tx_guard = Some(reset_tx);
+        }
 
         loop {
-            interval_timer.tick().await;
-
-            if !self.is_running.load(Ordering::Relaxed) {
-                continue;
-            }
-
-            if let Err(e) = self.advance_to_next_image().await {
-                error!("Failed to advance screensaver: {}", e);
-            }
-
-            // Check if interval has changed and update timer
             let current_interval = self.state.read().await.interval_seconds;
-            if interval_timer.period() != Duration::from_secs(current_interval) {
-                info!("Updating screensaver interval to {}s", current_interval);
-                interval_timer = interval(Duration::from_secs(current_interval));
+            
+            tokio::select! {
+                // Normal timer expiration
+                _ = sleep(Duration::from_secs(current_interval)) => {
+                    if self.is_running.load(Ordering::Relaxed) {
+                        if let Err(e) = self.advance_to_next_image().await {
+                            error!("Failed to advance screensaver: {}", e);
+                        }
+                    }
+                }
+                // Timer reset signal (from new upload or manual advance)
+                _ = reset_rx.recv() => {
+                    // Timer was reset, continue the loop with a fresh timer
+                    continue;
+                }
             }
         }
     }
@@ -162,6 +169,9 @@ impl ScreensaverSvc {
                 state.current_index = next_idx;
                 state.upload_count = uploads.len();
             }
+
+            // Reset the timer after manually advancing
+            self.reset_timer().await;
         }
 
         Ok(())
@@ -203,6 +213,9 @@ impl ScreensaverSvc {
                 state.current_index = prev_idx;
                 state.upload_count = uploads.len();
             }
+
+            // Reset the timer after manually going to previous
+            self.reset_timer().await;
         }
 
         Ok(())
@@ -263,12 +276,25 @@ impl ScreensaverSvc {
             let upload_count = self.get_rgb_upload_count().await.unwrap_or(0);
             self.current_index.store(0, Ordering::Relaxed);
             
-            let mut state = self.state.write().await;
-            state.current_index = 0;
-            state.upload_count = upload_count;
+            {
+                let mut state = self.state.write().await;
+                state.current_index = 0;
+                state.upload_count = upload_count;
+            }
+
+            // Reset the timer so the next image won't appear for a full interval
+            self.reset_timer().await;
         }
         
         Ok(())
+    }
+
+    /// Reset the slideshow timer
+    async fn reset_timer(&self) {
+        if let Some(tx) = &*self.reset_timer_tx.read().await {
+            // Send reset signal (ignore if channel is closed)
+            let _ = tx.send(());
+        }
     }
 }
 
@@ -279,6 +305,7 @@ impl Clone for ScreensaverSvc {
             is_running: Arc::clone(&self.is_running),
             current_index: Arc::clone(&self.current_index),
             context: Arc::clone(&self.context),
+            reset_timer_tx: Arc::clone(&self.reset_timer_tx),
         }
     }
 }

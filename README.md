@@ -79,7 +79,8 @@ mutation {
 ### Behavior
 
 - **Auto-start**: Screensaver starts automatically when the server boots
-- **New upload handling**: When a new RGB320x240 image is uploaded, it's immediately displayed and the slideshow resets to start from the beginning
+- **New upload handling**: When a new RGB320x240 image is uploaded, it's immediately displayed and the slideshow timer resets to provide the full interval before the next image
+- **Manual controls**: Using `nextImage` or `previousImage` mutations also resets the timer for a full interval
 - **Error handling**: Device communication failures are logged but don't stop the slideshow (useful when displays are offline for maintenance)
 - **Display filtering**: Only cycles through uploads with `display = "RGB_320x240"`
 

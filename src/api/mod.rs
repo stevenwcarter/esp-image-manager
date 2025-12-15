@@ -1,12 +1,13 @@
-use core::fmt;
-use std::str::FromStr;
+// use core::fmt;
+// use std::str::FromStr;
 
 use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::Json;
 use axum::{http::StatusCode, routing::get, Router};
-use serde::{de, Deserialize, Deserializer, Serialize};
+// use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::Serialize;
 
 use crate::context::GraphQLContext;
 
@@ -26,19 +27,19 @@ pub fn err_wrapper<T: Serialize>(result: anyhow::Result<T>) -> impl IntoResponse
     )
 }
 
-/// Serde deserialization decorator to map empty Strings to None,
-fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: FromStr,
-    T::Err: fmt::Display,
-{
-    let opt = Option::<String>::deserialize(de)?;
-    match opt.as_deref() {
-        None | Some("") => Ok(None),
-        Some(s) => FromStr::from_str(s).map_err(de::Error::custom).map(Some),
-    }
-}
+// /// Serde deserialization decorator to map empty Strings to None,
+// fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+// where
+//     D: Deserializer<'de>,
+//     T: FromStr,
+//     T::Err: fmt::Display,
+// {
+//     let opt = Option::<String>::deserialize(de)?;
+//     match opt.as_deref() {
+//         None | Some("") => Ok(None),
+//         Some(s) => FromStr::from_str(s).map_err(de::Error::custom).map(Some),
+//     }
+// }
 
 // Make our own error that wraps `anyhow::Error`.
 pub struct AppError(anyhow::Error);

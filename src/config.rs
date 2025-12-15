@@ -28,7 +28,7 @@ impl ConfigSvc {
         default_value: &str,
     ) -> Result<String, diesel::result::Error> {
         let mut conn = get_conn(ctx);
-        
+
         let result = config::table
             .filter(config::key.eq(key))
             .first::<Config>(&mut conn)
@@ -36,7 +36,7 @@ impl ConfigSvc {
 
         Ok(result
             .map(|config| config.value)
-            .unwrap_or_else(|| default_value.to_string()))
+            .unwrap_or_else(|| default_value.to_owned()))
     }
 
     /// Set a configuration value
@@ -60,7 +60,9 @@ impl ConfigSvc {
     }
 
     /// Get screensaver interval in seconds, defaults to 120 seconds
-    pub async fn get_screensaver_interval(ctx: &GraphQLContext) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn get_screensaver_interval(
+        ctx: &GraphQLContext,
+    ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
         let value = Self::get_config_value(ctx, "screensaver.interval", "120").await?;
         let seconds = u64::from_str(&value)?;
         Ok(seconds)
@@ -75,3 +77,4 @@ impl ConfigSvc {
         Ok(())
     }
 }
+

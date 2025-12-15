@@ -49,9 +49,6 @@ impl FromSql<Binary, Sqlite> for UUID {
 // Convert UUID to binary data for SQLite
 impl ToSql<Binary, Sqlite> for UUID {
     fn to_sql<'b>(&'b self, out: &mut Output<'b, '_, Sqlite>) -> serialize::Result {
-        Ok(<[u8] as ToSql<Binary, Sqlite>>::to_sql(
-            self.0.as_bytes(),
-            out,
-        )?)
+        <[u8] as ToSql<Binary, Sqlite>>::to_sql(self.0.as_bytes(), out)
     }
 }
